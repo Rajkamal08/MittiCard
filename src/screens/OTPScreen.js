@@ -46,28 +46,28 @@ function SMSSentModal({ visible, isError, phone, onClose }) {
         <Animated.View style={[styles.modalCard, { transform: [{ scale: scaleAnim }] }]}>
           {/* Icon */}
           <View style={styles.modalIconWrap}>
-            <Text style={styles.modalIcon}>{isError ? '❌' : '📞'}</Text>
+            <Text style={styles.modalIcon}>{isError ? '❌' : '📱'}</Text>
           </View>
 
           {isError ? (
             <>
-              <Text style={styles.modalTitle}>कुछ गलत हुआ</Text>
-              <Text style={styles.modalSub}>OTP नहीं भेजा जा सका। कृपया पुनः प्रयास करें।</Text>
+              <Text style={styles.modalTitle}>Something went wrong</Text>
+              <Text style={styles.modalSub}>Could not send the code. Please try again.</Text>
             </>
           ) : (
             <>
-              <Text style={styles.modalTitle}>OTP भेजा गया!</Text>
+              <Text style={styles.modalTitle}>Voice Call Coming!</Text>
               <Text style={styles.modalSub}>
-                {'फ़ोन कॉल आएगा — '}
+                {'A call will be made to '}
                 <Text style={{ fontWeight: '700', color: '#2D6A4F' }}>+91 {phone}</Text>
-                {' पर।\nकॉल उठाएं और OTP सुनें।'}
+                {'\nAnswer the call and note your OTP.'}
               </Text>
             </>
           )}
 
           {/* Button */}
           <TouchableOpacity style={styles.modalBtn} onPress={onClose} activeOpacity={0.85}>
-            <Text style={styles.modalBtnText}>{isError ? 'ठीक है' : 'OTP दर्ज करें'}</Text>
+            <Text style={styles.modalBtnText}>{isError ? 'OK' : 'Enter OTP'}</Text>
           </TouchableOpacity>
         </Animated.View>
       </Animated.View>
@@ -240,7 +240,7 @@ export default function OTPScreen({ navigation, route }) {
           style={styles.backBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Text style={styles.backBtnText}>← वापस</Text>
+          <Text style={styles.backBtnText}>← Back</Text>
         </TouchableOpacity>
       </View>
 
@@ -255,8 +255,8 @@ export default function OTPScreen({ navigation, route }) {
         >
           {/* Header */}
           <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <Text style={styles.heading}>नंबर सत्यापित करें</Text>
-            <Text style={styles.subText}>नीचे दिए गए बॉक्स में 6-अंकीय OTP दर्ज करें</Text>
+            <Text style={styles.heading}>Verify Your Number</Text>
+            <Text style={styles.subText}>Enter the 6-digit code from your voice call</Text>
             <Text style={styles.phoneText}>+91 {phone}</Text>
           </Animated.View>
 
@@ -298,21 +298,21 @@ export default function OTPScreen({ navigation, route }) {
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <Text style={[styles.btnText, !complete && styles.btnTextDisabled]}>
-                  {complete ? 'सत्यापित करें →' : `${OTP_LENGTH - filled} अंक और डालें`}
+                  {complete ? 'Verify & Login →' : `Enter ${OTP_LENGTH - filled} more digit${OTP_LENGTH - filled !== 1 ? 's' : ''}`}
                 </Text>
               )}
             </TouchableOpacity>
 
             {/* Resend */}
             <View style={styles.resendRow}>
-              <Text style={styles.resendLabel}>OTP नहीं मिला? </Text>
+              <Text style={styles.resendLabel}>Didn't receive it? </Text>
               {canResend ? (
                 <TouchableOpacity onPress={handleResend}>
-                  <Text style={styles.resendLink}>दोबारा भेजें</Text>
+                  <Text style={styles.resendLink}>Resend Code</Text>
                 </TouchableOpacity>
               ) : (
                 <Text style={styles.resendTimer}>
-                  {'पुनः भेजें '}<Text style={styles.resendTimerBold}>{String(timer).padStart(2, '0')}s</Text>{'  में'}
+                  Resend in <Text style={styles.resendTimerBold}>{String(timer).padStart(2, '0')}s</Text>
                 </Text>
               )}
             </View>
@@ -320,7 +320,7 @@ export default function OTPScreen({ navigation, route }) {
 
           {/* Footer */}
           <Animated.Text style={[styles.footer, { opacity: fadeAnim }]}>
-            🔒 यह OTP 5 मिनट के लिए वैध है
+            🔒 This code is valid for 5 minutes
           </Animated.Text>
         </ScrollView>
       </KeyboardAvoidingView>
