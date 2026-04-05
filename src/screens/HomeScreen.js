@@ -9,6 +9,7 @@ import {
   Animated,
   ActivityIndicator,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
 import { getAdvisory }    from '../services/api';
@@ -96,7 +97,14 @@ export default function HomeScreen({ navigation, route }) {
   const [refreshing,  setRefreshing]  = useState(false);
   const [error,       setError]       = useState(null);
 
-  // Animation refs
+  // ── Weather state ──────────────────────────────────────────────────────────
+  const [weather,     setWeather]     = useState(null);
+  const [weatherLoad, setWeatherLoad] = useState(false);
+
+  // ── Notification panel state ───────────────────────────────────────────────
+  const [showNotif,   setShowNotif]   = useState(false);
+  const [notifBadge,  setNotifBadge]  = useState(0);
+
   const headerFade   = useRef(new Animated.Value(0)).current;
   const cardSlide    = useRef(new Animated.Value(40)).current;
   const cardFade     = useRef(new Animated.Value(0)).current;
@@ -144,9 +152,7 @@ export default function HomeScreen({ navigation, route }) {
 
   // ─── Refresh when navigating back to Home after a new scan ─────────────────
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadData(false);
-    });
+    const unsubscribe = navigation.addListener('focus', () => { loadData(false); });
     return unsubscribe;
   }, [navigation, loadData]);
 
@@ -155,6 +161,80 @@ export default function HomeScreen({ navigation, route }) {
     await clearStorage();
     setAuthToken(null);
     navigation.replace('Login');
+  };
+
+  // ─── Fetch weather using IP-based location (no GPS permission needed) ────────
+  useEffect(() => {
+    const fetchWeather = async () => {
+      setWeatherLoad(true);
+      try {
+        // Step 1: Get lat/lon from IP address (free, no key, no permission)
+        const locRes  = await fetch('https://ip-api.com/json/');
+        const locData = await locRes.json();
+        if (!locData.lat) throw new Error('Location unavailable');
+
+        // Step 2: Fetch weather from Open-Meteo (free, no key)
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${locData.lat.toFixed(2)}&longitude=${locData.lon.toFixed(2)}&current_weather=true&timezone=Asia%2FKolkata`;
+        const wRes  = await fetch(url);
+        const wData = await wRes.json();
+        if (wData.current_weather) setWeather(wData.current_weather);
+      } catch { /* fail silently — weather is optional */ }
+      setWeatherLoad(false);
+    };
+    fetchWeather();
+  }, []);
+
+  // ─── Build notifications from scan data ─────────────────────────────────────
+  useEffect(() => {
+    if (!lastScan) { setNotifBadge(0); return; }
+    const alerts = [];
+    const ns = lastScan;
+    if (ns.nitrogen        !== null && ns.nitrogen        < 140) alerts.push(1);
+    if (ns.phosphorus      !== null && ns.phosphorus      < 11)  alerts.push(1);
+    if (ns.potassium       !== null && ns.potassium       < 108) alerts.push(1);
+    if (ns.organic_carbon  !== null && ns.organic_carbon  < 0.5) alerts.push(1);
+    if (ns.zinc            !== null && ns.zinc            < 0.6) alerts.push(1);
+    if (ns.ph !== null && (ns.ph < 5.5 || ns.ph > 8.0))          alerts.push(1);
+    setNotifBadge(alerts.length);
+  }, [lastScan]);
+
+  // ─── WMO weather code → emoji + description ──────────────────────────────
+  const wmoWeather = (code, temp) => {
+    if (code === 0)              return { emoji: '☀️', desc: 'Clear sky' };
+    if (code <= 2)               return { emoji: '⛅', desc: 'Partly cloudy' };
+    if (code === 3)              return { emoji: '☁️', desc: 'Overcast' };
+    if (code <= 48)              return { emoji: '🌫️', desc: 'Foggy' };
+    if (code <= 67)              return { emoji: '🌧️', desc: 'Rainy' };
+    if (code <= 77)              return { emoji: '❄️', desc: 'Snowy' };
+    if (code <= 82)              return { emoji: '🌦️', desc: 'Rain showers' };
+    if (code <= 99)              return { emoji: '⛈️', desc: 'Thunderstorm' };
+    return { emoji: temp > 35 ? '🌡️' : '🌤️', desc: 'Variable' };
+  };
+
+  // ─── Notification items built from scan ──────────────────────────────────
+  const buildNotifications = () => {
+    const list = [];
+    if (!lastScan) {
+      list.push({ id: 1, icon: '📋', title: 'No scan yet', body: 'Scan your soil card to get personalized alerts.' });
+      return list;
+    }
+    const ns = lastScan;
+    if (ns.nitrogen       !== null && ns.nitrogen       < 140)
+      list.push({ id: 2, icon: '🔴', title: 'Nitrogen is LOW', body: `Your N is ${ns.nitrogen} kg/ha. Ideal: ≥140. Apply Urea or DAP this season.` });
+    if (ns.phosphorus     !== null && ns.phosphorus     < 11)
+      list.push({ id: 3, icon: '🔴', title: 'Phosphorus is LOW', body: `Your P is ${ns.phosphorus} kg/ha. Apply SSP or DAP.` });
+    if (ns.potassium      !== null && ns.potassium      < 108)
+      list.push({ id: 4, icon: '🟠', title: 'Potassium is LOW', body: `Your K is ${ns.potassium} kg/ha. Apply MOP (Muriate of Potash).` });
+    if (ns.organic_carbon !== null && ns.organic_carbon < 0.5)
+      list.push({ id: 5, icon: '🟠', title: 'Organic Carbon LOW', body: 'Add compost or green manure to improve OC levels.' });
+    if (ns.zinc           !== null && ns.zinc           < 0.6)
+      list.push({ id: 6, icon: '🟡', title: 'Zinc Deficient', body: 'Apply Zinc Sulphate @ 25 kg/ha to correct deficiency.' });
+    if (ns.ph !== null && (ns.ph < 5.5 || ns.ph > 8.0))
+      list.push({ id: 7, icon: '⚠️', title: `pH is ${ns.ph < 5.5 ? 'too Acidic' : 'too Alkaline'}`, body: ns.ph < 5.5 ? 'Apply Agricultural Lime to neutralize acidity.' : 'Apply Gypsum to correct alkalinity.' });
+    if (list.length === 0)
+      list.push({ id: 8, icon: '✅', title: 'All nutrients healthy!', body: 'Your soil is in great condition. Keep scanning every season.' });
+    list.push({ id: 9, icon: '💡', title: 'Tip: Best time to apply', body: 'Apply fertilizers early morning or after rain for best absorption.' });
+    return list;
   };
 
   // ─── Greeting based on time ─────────────────────────────────────────────────
@@ -197,14 +277,45 @@ export default function HomeScreen({ navigation, route }) {
               </View>
               {/* Notification bell + logout */}
               <View style={styles.headerActions}>
-                <TouchableOpacity style={styles.iconBtn}>
+                {/* Bell with badge */}
+                <TouchableOpacity style={[styles.iconBtn, { position: 'relative' }]} onPress={() => setShowNotif(true)}>
                   <Text style={styles.iconBtnText}>🔔</Text>
+                  {notifBadge > 0 && (
+                    <View style={{ position: 'absolute', top: -2, right: -2, backgroundColor: '#E63946', borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>{notifBadge}</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.iconBtn} onPress={handleLogout}>
                   <Text style={styles.iconBtnText}>↩️</Text>
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* ── WEATHER WIDGET ─────────────────────────────────────────── */}
+            {(weather || weatherLoad) && (
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 12, marginTop: 8, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                {weatherLoad ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : weather ? (
+                  <>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontSize: 26 }}>{wmoWeather(weather.weathercode, weather.temperature).emoji}</Text>
+                      <View>
+                        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>{Math.round(weather.temperature)}°C</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>{wmoWeather(weather.weathercode, weather.temperature).desc}</Text>
+                      </View>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11 }}>💨 {weather.windspeed} km/h</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, marginTop: 2 }}>
+                        {weather.temperature > 35 ? '🌡️ Hot — irrigate crops' : weather.temperature < 15 ? '🥶 Cold — protect seedlings' : '✅ Good conditions'}
+                      </Text>
+                    </View>
+                  </>
+                ) : null}
+              </View>
+            )}
 
             {/* ── SCORE CARD ───────────────────────────────────────────────── */}
             <View style={[styles.scoreCard, shadows.lg]}>
@@ -398,6 +509,64 @@ export default function HomeScreen({ navigation, route }) {
           )}
         </Animated.View>
       </ScrollView>
+
+      {/* ── NOTIFICATION MODAL ────────────────────────────────────────── */}
+      <Modal
+        visible={showNotif}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowNotif(false)}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}
+          activeOpacity={1}
+          onPress={() => setShowNotif(false)}
+        >
+          <View style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+            maxHeight: '75%', paddingBottom: 30,
+          }}>
+            {/* Handle */}
+            <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 8 }}>
+              <View style={{ width: 40, height: 4, backgroundColor: '#E2EBE7', borderRadius: 2 }} />
+            </View>
+
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F0F7F4' }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: '#1B2E25' }}>
+                🔔 Soil Alerts
+              </Text>
+              {notifBadge > 0 && (
+                <View style={{ backgroundColor: '#E63946', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 }}>
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{notifBadge} alerts</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Notification list */}
+            <ScrollView style={{ paddingHorizontal: 20, paddingTop: 12 }} showsVerticalScrollIndicator={false}>
+              {buildNotifications().map(n => (
+                <View key={n.id} style={{
+                  flexDirection: 'row', gap: 12, paddingVertical: 12,
+                  borderBottomWidth: 1, borderBottomColor: '#F0F7F4',
+                }}>
+                  <Text style={{ fontSize: 22, marginTop: 2 }}>{n.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#1B2E25', marginBottom: 3 }}>
+                      {n.title}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: '#6B8F7A', lineHeight: 18 }}>
+                      {n.body}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

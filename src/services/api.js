@@ -87,4 +87,17 @@ export const scanImageForOCR = (image_base64) =>
 export const submitOCRSoilData = data =>
   api.post('/advisory/ocr', data);
 
+// ─── FPO Dashboard API calls ──────────────────────────────────────────────────
+export const getFPOFarms = () =>
+  api.get('/fpo/farms');
+
+export const getFPOStats = () =>
+  api.get('/fpo/stats');
+
+export const getFPODistrictFarms = () =>
+  api.get('/fpo/district-farms');
+
+export const addFarmToFPO = (farm_id) =>
+  api.post('/fpo/members', { farm_id });
+
 export default api;

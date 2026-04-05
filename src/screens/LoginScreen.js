@@ -15,10 +15,8 @@ import {
 } from 'react-native';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
 import { sendOTP } from '../services/api';
-import { useTranslation } from 'react-i18next';
 
 export default function LoginScreen({ navigation }) {
-  const { t } = useTranslation();
   const [phone, setPhone]       = useState('');
   const [loading, setLoading]   = useState(false);
   const [focused, setFocused]   = useState(false);
@@ -59,7 +57,7 @@ export default function LoginScreen({ navigation }) {
 
     if (cleaned.length !== 10 || isNaN(cleaned)) {
       shakeInput();
-      Alert.alert(t('common.error'), t('login.error_invalid'));
+      Alert.alert('Error', 'Please enter a valid 10-digit mobile number.');
       return;
     }
 
@@ -68,10 +66,9 @@ export default function LoginScreen({ navigation }) {
       const response = await sendOTP(cleaned);
 
       if (response.data.success) {
-        // Navigate to OTP screen, pass phone + devOTP (for emulator testing)
         navigation.navigate('OTP', {
           phone: cleaned,
-          dev_otp: response.data.dev_otp,
+          dev_otp: response.data.dev_otp, // present only if SMS failed (fallback)
         });
       }
     } catch (err) {
@@ -112,8 +109,8 @@ export default function LoginScreen({ navigation }) {
               <Text style={styles.logoEmoji}>🌱</Text>
             </View>
             <Text style={styles.appTitle}>MittiCard</Text>
-            <Text style={styles.welcomeText}>{t('login.title')}</Text>
-            <Text style={styles.subtitle}>{t('login.subtitle')}</Text>
+            <Text style={styles.welcomeText}>Welcome to MittiCard</Text>
+            <Text style={styles.subtitle}>Soil health advisory for Indian farmers</Text>
           </Animated.View>
 
           {/* Card */}
@@ -124,11 +121,11 @@ export default function LoginScreen({ navigation }) {
               { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
             ]}
           >
-            <Text style={styles.cardTitle}>{t('otp.title')}</Text>
-            <Text style={styles.cardSubtitle}>{t('login.subtitle')}</Text>
+            <Text style={styles.cardTitle}>Sign In</Text>
+            <Text style={styles.cardSubtitle}>Enter your mobile number to continue</Text>
 
             {/* Phone Input */}
-            <Text style={styles.label}>{t('login.phone_placeholder')}</Text>
+            <Text style={styles.label}>Mobile Number</Text>
             <Animated.View
               style={[
                 styles.inputWrapper,
@@ -183,22 +180,17 @@ export default function LoginScreen({ navigation }) {
                 <ActivityIndicator color={colors.textOnPrimary} size="small" />
               ) : (
                 <>
-                  <Text style={styles.sendBtnText}>{loading ? t('login.sending') : t('login.send_otp')}</Text>
+                  <Text style={styles.sendBtnText}>{loading ? 'Sending…' : 'Get OTP via Voice Call'}</Text>
                   <Text style={styles.sendBtnArrow}> →</Text>
                 </>
               )}
             </TouchableOpacity>
 
-            {/* Dev hint */}
-            <Text style={styles.devHint}>
-              📱 Dev mode: OTP is always{' '}
-              <Text style={styles.devOTP}>1234</Text>
-            </Text>
           </Animated.View>
 
           {/* Footer */}
           <Animated.Text style={[styles.footer, { opacity: fadeAnim }]}>
-            Your data is safe 🔒 · No spam guaranteed
+            🔒 Your data is safe · No spam guaranteed
           </Animated.Text>
         </ScrollView>
       </KeyboardAvoidingView>

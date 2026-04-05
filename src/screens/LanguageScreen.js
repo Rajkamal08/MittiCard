@@ -119,8 +119,8 @@ export default function LanguageScreen({ navigation, route }) {
         </View>
 
         {/* ── Title ───────────────────────────────────────────────────── */}
-        <Text style={styles.title}>{t('language.screen_title')}</Text>
-        <Text style={styles.subtitle}>{t('language.screen_sub')}</Text>
+        <Text style={styles.title}>अपनी भाषा चुनें</Text>
+        <Text style={styles.subtitle}>Select Your Preferred Language</Text>
 
         {/* ── Language cards ──────────────────────────────────────────── */}
         <View style={styles.cardsRow}>
@@ -195,7 +195,7 @@ export default function LanguageScreen({ navigation, route }) {
           <Text style={styles.continueBtnText}>
             {saving
               ? (selected === 'hi' ? 'सहेज रहे हैं...' : 'Saving...')
-              : t('language.continue')}
+              : (selected === 'hi' ? 'आगे बढ़ें →' : 'Continue →')}
           </Text>
           <Text style={styles.continueBtnArrow}>→</Text>
         </TouchableOpacity>

@@ -211,6 +211,162 @@ function ScoreRing({ score }) {
   );
 }
 
+// ─── Ideal reference values for each nutrient ─────────────────────────────
+const IDEAL_VALUES = {
+  ph:             6.5,
+  nitrogen:       280,
+  phosphorus:     25,
+  potassium:      280,
+  organic_carbon: 0.75,
+  zinc:           1.2,
+  sulfur:         20,
+  iron:           10,
+};
+
+const NUTRIENT_ABBR = {
+  nitrogen: 'N', phosphorus: 'P', potassium: 'K',
+  organic_carbon: 'OC', ph: 'pH', zinc: 'Zn', sulfur: 'S', iron: 'Fe',
+};
+
+// ─── Circular Gauge Ring (% of ideal) ─────────────────────────────────────
+function NutrientGauge({ nutrientKey, value, index }) {
+  const ideal   = IDEAL_VALUES[nutrientKey] || 1;
+  const pct     = value != null ? Math.min(Math.round((value / ideal) * 100), 150) : null;
+  const color   = pct == null ? '#ccc'
+                : pct >= 90  ? '#40916C'
+                : pct >= 50  ? '#F4A261'
+                :              '#E63946';
+  const abbr    = NUTRIENT_ABBR[nutrientKey] || nutrientKey;
+  const meta    = NUTRIENT_LABELS[nutrientKey] || { label: nutrientKey, unit: '' };
+
+  const scaleAnim = useRef(new Animated.Value(0.4)).current;
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1, tension: 60, friction: 7, delay: index * 70, useNativeDriver: true }),
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 500, delay: index * 70, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ alignItems: 'center', width: 72, opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
+      <View style={{
+        width: 62, height: 62, borderRadius: 31,
+        borderWidth: 5, borderColor: color,
+        backgroundColor: color + '15',
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Text style={{ fontSize: 13, fontWeight: '800', color, lineHeight: 16 }}>
+          {pct != null ? `${pct}%` : '—'}
+        </Text>
+        <Text style={{ fontSize: 8, color: '#999', lineHeight: 11 }}>of ideal</Text>
+      </View>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: '#333', marginTop: 5 }}>{abbr}</Text>
+      {value != null && (
+        <Text style={{ fontSize: 9, color: '#999', marginTop: 1 }}>
+          {value} / {ideal}
+        </Text>
+      )}
+    </Animated.View>
+  );
+}
+
+// ─── Current vs Ideal Vertical Bar Chart ──────────────────────────────────
+function NutrientBarChart({ nutrientStatus }) {
+  const BAR_KEYS = [
+    { key: 'nitrogen',       label: 'N' },
+    { key: 'phosphorus',     label: 'P' },
+    { key: 'potassium',      label: 'K' },
+    { key: 'organic_carbon', label: 'OC' },
+    { key: 'ph',             label: 'pH' },
+  ];
+  const MAX_H = 110;
+
+  const allVals = BAR_KEYS.flatMap(({ key }) => [
+    nutrientStatus[key]?.value || 0,
+    IDEAL_VALUES[key] || 0,
+  ]);
+  const maxVal = Math.max(...allVals, 1);
+
+  const [selectedBar, setSelectedBar] = useState(null);
+
+  return (
+    <View>
+      <Text style={{ fontSize: 14, fontWeight: '700', color: '#1B2E25', marginBottom: 14 }}>
+        📈 Current vs Ideal Levels
+      </Text>
+
+      {/* Tooltip */}
+      {selectedBar && (
+        <View style={{
+          backgroundColor: '#1B2E25', borderRadius: 8, padding: 8,
+          marginBottom: 10, alignSelf: 'center',
+        }}>
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{selectedBar.label}</Text>
+          <Text style={{ color: '#95D5B2', fontSize: 11 }}>Current: {selectedBar.current ?? '—'}</Text>
+          <Text style={{ color: '#D8F3DC', fontSize: 11 }}>Ideal: {selectedBar.ideal}</Text>
+        </View>
+      )}
+
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: MAX_H + 32, paddingHorizontal: 8 }}>
+        {BAR_KEYS.map(({ key, label }) => {
+          const current = nutrientStatus[key]?.value;
+          const ideal   = IDEAL_VALUES[key] || 1;
+          const curH    = current != null ? Math.max(Math.round((current / maxVal) * MAX_H), 4) : 0;
+          const idealH  = Math.max(Math.round((ideal / maxVal) * MAX_H), 4);
+          const color   = current == null ? '#ddd'
+                        : current >= ideal * 0.9 ? '#40916C'
+                        : current >= ideal * 0.5 ? '#F4A261'
+                        :                          '#E63946';
+          return (
+            <View key={key} style={{ flex: 1, alignItems: 'center' }}>
+              {current != null && (
+                <Text style={{ fontSize: 8, color, fontWeight: '700', marginBottom: 2 }}>
+                  {current}
+                </Text>
+              )}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3 }}>
+                {/* Ideal bar */}
+                <View style={{
+                  width: 12, height: idealH,
+                  backgroundColor: '#D8F3DC', borderRadius: 3,
+                  borderWidth: 1, borderColor: '#52B788',
+                }} />
+                {/* Current bar — tappable */}
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  onPress={() => setSelectedBar({ label, current, ideal })}
+                >
+                  <View style={{
+                    width: 12, height: current != null ? curH : 4,
+                    backgroundColor: color, borderRadius: 3,
+                  }} />
+                </TouchableOpacity>
+              </View>
+              <Text style={{ fontSize: 9, color: '#6B8F7A', fontWeight: '600', marginTop: 4 }}>
+                {label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Legend */}
+      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#E63946' }} />
+          <Text style={{ fontSize: 10, color: '#999' }}>Current</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#D8F3DC', borderWidth: 1, borderColor: '#52B788' }} />
+          <Text style={{ fontSize: 10, color: '#999' }}>Ideal</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+
 // ─── Nutrient Row ──────────────────────────────────────────────────────────
 function NutrientRow({ nutrientKey, data, index }) {
   const meta   = NUTRIENT_LABELS[nutrientKey] || { label: nutrientKey, unit: '' };
@@ -401,6 +557,35 @@ export default function AdvisoryResultScreen({ navigation, route }) {
 
         <View style={styles.body}>
 
+          {/* ── NUTRIENT GAUGES — % of ideal ──────────────────────── */}
+          <View style={[styles.section, shadows.sm, { paddingVertical: 18 }]}>
+            <Text style={styles.sectionTitle}>🎯 Nutrient Levels at a Glance</Text>
+            <Text style={[styles.sectionSub, { marginBottom: 14 }]}>
+              How each nutrient compares to its ideal level
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 2, paddingBottom: 4 }}>
+                {nutrientKeys.map((key, i) => {
+                  const val = advisory.nutrient_status[key]?.value;
+                  if (!IDEAL_VALUES[key]) return null;
+                  return (
+                    <NutrientGauge
+                      key={key}
+                      nutrientKey={key}
+                      value={val}
+                      index={i}
+                    />
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* ── CURRENT vs IDEAL BAR CHART ────────────────────────── */}
+          <View style={[styles.section, shadows.sm]}>
+            <NutrientBarChart nutrientStatus={advisory.nutrient_status || {}} />
+          </View>
+
           {/* ── NUTRIENT STATUS ─────────────────────────────────────── */}
           <View style={[styles.section, shadows.sm]}>
             <Text style={styles.sectionTitle}>📊 {t('advisory.section_status')}</Text>
@@ -414,6 +599,7 @@ export default function AdvisoryResultScreen({ navigation, route }) {
               />
             ))}
           </View>
+
 
           {/* ── FERTILIZER RECOMMENDATIONS ──────────────────────────── */}
           {recs.length > 0 ? (
