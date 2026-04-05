@@ -278,11 +278,11 @@ export default function HomeScreen({ navigation, route }) {
               {/* Notification bell + logout */}
               <View style={styles.headerActions}>
                 {/* Bell with badge */}
-                <TouchableOpacity style={[styles.iconBtn, { position: 'relative' }]} onPress={() => setShowNotif(true)}>
+                <TouchableOpacity style={styles.iconBtnRelative} onPress={() => setShowNotif(true)}>
                   <Text style={styles.iconBtnText}>🔔</Text>
                   {notifBadge > 0 && (
-                    <View style={{ position: 'absolute', top: -2, right: -2, backgroundColor: '#E63946', borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>{notifBadge}</Text>
+                    <View style={styles.notifBadge}>
+                      <Text style={styles.notifBadgeText}>{notifBadge}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -294,21 +294,21 @@ export default function HomeScreen({ navigation, route }) {
 
             {/* ── WEATHER WIDGET ─────────────────────────────────────────── */}
             {(weather || weatherLoad) && (
-              <View style={{ backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 12, marginTop: 8, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={styles.weatherWidget}>
                 {weatherLoad ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : weather ? (
                   <>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={{ fontSize: 26 }}>{wmoWeather(weather.weathercode, weather.temperature).emoji}</Text>
+                    <View style={styles.weatherLeft}>
+                      <Text style={styles.weatherEmoji}>{wmoWeather(weather.weathercode, weather.temperature).emoji}</Text>
                       <View>
-                        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>{Math.round(weather.temperature)}°C</Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>{wmoWeather(weather.weathercode, weather.temperature).desc}</Text>
+                        <Text style={styles.weatherTemp}>{Math.round(weather.temperature)}°C</Text>
+                        <Text style={styles.weatherDesc}>{wmoWeather(weather.weathercode, weather.temperature).desc}</Text>
                       </View>
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11 }}>💨 {weather.windspeed} km/h</Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, marginTop: 2 }}>
+                    <View style={styles.weatherRight}>
+                      <Text style={styles.weatherWind}>💨 {weather.windspeed} km/h</Text>
+                      <Text style={styles.weatherTip}>
                         {weather.temperature > 35 ? '🌡️ Hot — irrigate crops' : weather.temperature < 15 ? '🥶 Cold — protect seedlings' : '✅ Good conditions'}
                       </Text>
                     </View>
@@ -518,51 +518,38 @@ export default function HomeScreen({ navigation, route }) {
         onRequestClose={() => setShowNotif(false)}
       >
         <TouchableOpacity
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}
+          style={styles.notifOverlay}
           activeOpacity={1}
           onPress={() => setShowNotif(false)}
         >
-          <View style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0,
-            backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-            maxHeight: '75%', paddingBottom: 30,
-          }}>
+          <View style={styles.notifSheet}>
             {/* Handle */}
-            <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 8 }}>
-              <View style={{ width: 40, height: 4, backgroundColor: '#E2EBE7', borderRadius: 2 }} />
+            <View style={styles.notifHandleRow}>
+              <View style={styles.notifHandle} />
             </View>
 
             {/* Header */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F0F7F4' }}>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: '#1B2E25' }}>
-                🔔 Soil Alerts
-              </Text>
+            <View style={styles.notifSheetHeader}>
+              <Text style={styles.notifSheetTitle}>🔔 Soil Alerts</Text>
               {notifBadge > 0 && (
-                <View style={{ backgroundColor: '#E63946', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 }}>
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{notifBadge} alerts</Text>
+                <View style={styles.notifCountPill}>
+                  <Text style={styles.notifCountText}>{notifBadge} alerts</Text>
                 </View>
               )}
             </View>
 
             {/* Notification list */}
-            <ScrollView style={{ paddingHorizontal: 20, paddingTop: 12 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.notifScroll} showsVerticalScrollIndicator={false}>
               {buildNotifications().map(n => (
-                <View key={n.id} style={{
-                  flexDirection: 'row', gap: 12, paddingVertical: 12,
-                  borderBottomWidth: 1, borderBottomColor: '#F0F7F4',
-                }}>
-                  <Text style={{ fontSize: 22, marginTop: 2 }}>{n.icon}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#1B2E25', marginBottom: 3 }}>
-                      {n.title}
-                    </Text>
-                    <Text style={{ fontSize: 13, color: '#6B8F7A', lineHeight: 18 }}>
-                      {n.body}
-                    </Text>
+                <View key={n.id} style={styles.notifItem}>
+                  <Text style={styles.notifItemIcon}>{n.icon}</Text>
+                  <View style={styles.notifItemBody}>
+                    <Text style={styles.notifItemTitle}>{n.title}</Text>
+                    <Text style={styles.notifItemText}>{n.body}</Text>
                   </View>
                 </View>
               ))}
-              <View style={{ height: 20 }} />
+              <View style={styles.notifListFooter} />
             </ScrollView>
           </View>
         </TouchableOpacity>
@@ -634,8 +621,159 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconBtnRelative: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
   iconBtnText: {
     fontSize: 18,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#E63946',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  notifBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  // Weather widget
+  weatherWidget: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 14,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  weatherLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  weatherEmoji: {
+    fontSize: 28,
+    marginRight: 10,
+  },
+  weatherTemp: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  weatherDesc: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  weatherRight: {
+    alignItems: 'flex-end',
+  },
+  weatherWind: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+  },
+  weatherTip: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 10,
+    marginTop: 3,
+  },
+  // Notification modal
+  notifOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.42)',
+  },
+  notifSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    maxHeight: '76%',
+    paddingBottom: 32,
+  },
+  notifHandleRow: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  notifHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E2EBE7',
+    borderRadius: 2,
+  },
+  notifSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F7F4',
+  },
+  notifSheetTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1B2E25',
+  },
+  notifCountPill: {
+    backgroundColor: '#E63946',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  notifCountText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  notifScroll: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  notifItem: {
+    flexDirection: 'row',
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F7F4',
+  },
+  notifItemIcon: {
+    fontSize: 22,
+    marginTop: 2,
+    marginRight: 12,
+  },
+  notifItemBody: {
+    flex: 1,
+  },
+  notifItemTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1B2E25',
+    marginBottom: 3,
+  },
+  notifItemText: {
+    fontSize: 13,
+    color: '#6B8F7A',
+    lineHeight: 19,
+  },
+  notifListFooter: {
+    height: 24,
   },
 
   // Score Card inside header

@@ -391,7 +391,7 @@ export default function SoilInputScreen({ navigation }) {
 
               <View style={styles.rowInputs}>
                 {/* Farm Size */}
-                <View style={styles.halfField}>
+                <View style={[styles.halfField, styles.halfFieldLeft]}>
                   <Text style={styles.fieldLabel}>
                     Farm Size <Text style={styles.required}>*</Text>
                   </Text>
@@ -542,7 +542,6 @@ const styles = StyleSheet.create({
   ocrShortcut: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: radius.full,
     paddingHorizontal: spacing.md,
@@ -550,7 +549,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
   },
-  ocrShortcutEmoji: { fontSize: 14 },
+  ocrShortcutEmoji: { fontSize: 14, marginRight: 6 },
   ocrShortcutText: {
     fontSize: fontSizes.xs,
     color: '#fff',
@@ -571,7 +570,6 @@ const styles = StyleSheet.create({
   kav: { flex: 1 },
   scroll: {
     padding: spacing.lg,
-    gap: spacing.lg,
     paddingBottom: spacing.xxl,
   },
 
@@ -580,17 +578,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
   cardTitle: {
     fontSize: fontSizes.lg,
     fontWeight: fontWeights.bold,
     color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   cardSub: {
     fontSize: fontSizes.sm,
     color: colors.textSecondary,
-    marginTop: -spacing.xs,
+    marginBottom: spacing.sm,
   },
 
   // Crop selector
@@ -609,9 +608,8 @@ const styles = StyleSheet.create({
   cropSelectorFilled: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
   },
-  cropSelectorEmoji: { fontSize: 22 },
+  cropSelectorEmoji: { fontSize: 22, marginRight: spacing.sm },
   cropSelectorLabel: {
     fontSize: fontSizes.lg,
     fontWeight: fontWeights.semibold,
@@ -629,24 +627,25 @@ const styles = StyleSheet.create({
   // Row inputs (farm size + date side by side)
   rowInputs: {
     flexDirection: 'row',
-    gap: spacing.md,
+    marginTop: spacing.xs,
   },
   halfField: {
     flex: 1,
-    gap: 4,
+  },
+  halfFieldLeft: {
+    marginRight: spacing.md,
   },
 
   // Field
   fieldWrapper: {
-    gap: 4,
+    marginBottom: spacing.md,
   },
   fieldHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: 2,
+    marginBottom: 6,
   },
-  fieldEmoji: { fontSize: 14 },
+  fieldEmoji: { fontSize: 14, marginRight: spacing.xs },
   fieldLabel: {
     fontSize: fontSizes.sm,
     fontWeight: fontWeights.semibold,
@@ -744,7 +743,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     padding: spacing.xl,
     paddingBottom: spacing.xxl,
-    gap: spacing.sm,
   },
   modalHandle: {
     width: 40,
@@ -766,12 +764,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
-    gap: spacing.md,
+    marginBottom: 2,
   },
   cropOptionSelected: {
     backgroundColor: colors.primary + '18',
   },
-  cropEmoji: { fontSize: 24, width: 32 },
+  cropEmoji: { fontSize: 24, width: 32, marginRight: spacing.md },
   cropLabel: {
     flex: 1,
     fontSize: fontSizes.lg,

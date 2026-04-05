@@ -13,10 +13,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl, StatusBar, Alert,
-  Modal, ScrollView, Animated, Linking,
+  Modal, ScrollView, Animated, Linking, Platform,
 } from 'react-native';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
 import { getFPOFarms, getFPOStats, getFPODistrictFarms, addFarmToFPO } from '../services/api';
+
+const HEADER_PADDING_TOP = Platform.OS === 'android' ? 48 : 52;
 
 // ─── Nutrient Status Badge ─────────────────────────────────────────────────────
 const Badge = ({ label, value, low }) => (
@@ -295,6 +297,10 @@ export default function FPODashboardScreen({ navigation }) {
           data={farms}
           keyExtractor={(item, i) => item.farm_id?.toString() || i.toString()}
           contentContainerStyle={styles.listContent}
+          removeClippedSubviews={true}
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          windowSize={10}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
           ListHeaderComponent={() => (
             <>
@@ -379,12 +385,23 @@ const styles = StyleSheet.create({
   // Header
   header: {
     backgroundColor: colors.primary,
-    paddingTop: 48,
-    paddingBottom: 20,
-    paddingHorizontal: spacing.md,
+    paddingTop: HEADER_PADDING_TOP,
+    paddingBottom: 22,
+    paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
+    overflow: 'hidden',
     ...shadows.md,
+  },
+  headerBubble: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: colors.primaryLight,
+    opacity: 0.3,
   },
   backBtn:       { padding: 8, marginRight: 8 },
   backArrow:     { fontSize: 22, color: '#fff', fontWeight: fontWeights.bold },
