@@ -97,7 +97,13 @@ export default function OTPScreen({ navigation, route }) {
       Animated.timing(fadeAnim,  { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]).start();
-    // OTP is NOT shown in the app — delivered via SMS only
+
+    // Auto-fill OTP boxes if dev_otp returned (DND demo phones)
+    if (dev_otp) {
+      const digits = String(dev_otp).split('').slice(0, OTP_LENGTH);
+      const filled = [...digits, ...Array(OTP_LENGTH - digits.length).fill('')];
+      setOtp(filled);
+    }
   }, []);
 
   // ─── Countdown ───────────────────────────────────────────────────────────────
@@ -259,6 +265,13 @@ export default function OTPScreen({ navigation, route }) {
             <Text style={styles.subText}>Enter the 6-digit code from your voice call</Text>
             <Text style={styles.phoneText}>+91 {phone}</Text>
           </Animated.View>
+
+          {/* Demo hint — only shows when dev_otp is present (DND phones) */}
+          {dev_otp ? (
+            <View style={styles.demoHint}>
+              <Text style={styles.demoHintText}>📋 OTP auto-filled: {dev_otp}</Text>
+            </View>
+          ) : null}
 
           {/* Card */}
           <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
@@ -606,5 +619,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
+  },
+  demoHint: {
+    backgroundColor: '#FFF8E1',
+    borderWidth: 1,
+    borderColor: '#FFD54F',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  demoHintText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#B45309',
+    letterSpacing: 0.5,
   },
 });
