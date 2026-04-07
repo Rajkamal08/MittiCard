@@ -12,9 +12,9 @@ import {
   Modal,
 } from 'react-native';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
-import { getAdvisory }    from '../services/api';
+import { getAdvisory } from '../services/api';
 import { getUser, getLastScanId, clearStorage } from '../services/storage';
-import { setAuthToken }   from '../services/api';
+import { setAuthToken } from '../services/api';
 import { useTranslation } from 'react-i18next';
 
 // ─── Score helpers ────────────────────────────────────────────────────────────
@@ -27,14 +27,14 @@ const getScoreColor = score => {
 const getScoreLabel = (score, t) => {
   if (score >= 71) return t('advisory.score_good');
   if (score >= 41) return t('advisory.score_fair');
-  if (score >= 1)  return t('advisory.score_poor');
+  if (score >= 1) return t('advisory.score_poor');
   return '—';
 };
 
 const getScoreEmoji = score => {
   if (score >= 71) return '🟢';
   if (score >= 41) return '🟡';
-  if (score >= 1)  return '🔴';
+  if (score >= 1) return '🔴';
   return '🌱';
 };
 
@@ -47,7 +47,7 @@ const formatDate = dateStr => {
 // ─── Animated Score Ring ──────────────────────────────────────────────────────
 function ScoreRing({ score, color }) {
   const scaleAnim = useRef(new Animated.Value(0.5)).current;
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -71,9 +71,9 @@ function ScoreRing({ score, color }) {
 // ─── Nutrient Status Badge ─────────────────────────────────────────────────────
 function NutrientBadge({ label, value, unit, threshold }) {
   const isLow = value !== null && value < threshold;
-  const bg    = isLow ? '#FFF0F0' : '#F0FAF4';
-  const fg    = isLow ? colors.statusPoor : colors.statusGood;
-  const tag   = isLow ? 'LOW' : 'OK';
+  const bg = isLow ? '#FFF0F0' : '#F0FAF4';
+  const fg = isLow ? colors.statusPoor : colors.statusGood;
+  const tag = isLow ? 'LOW' : 'OK';
 
   return (
     <View style={[styles.nutrientBadge, { backgroundColor: bg }]}>
@@ -91,30 +91,30 @@ function NutrientBadge({ label, value, unit, threshold }) {
 // ─── Main HomeScreen ──────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation, route }) {
   const { t } = useTranslation();
-  const [user,        setUser]        = useState(route?.params?.user || null);
-  const [lastScan,    setLastScan]    = useState(null);
-  const [loading,     setLoading]     = useState(true);
-  const [refreshing,  setRefreshing]  = useState(false);
-  const [error,       setError]       = useState(null);
+  const [user, setUser] = useState(route?.params?.user || null);
+  const [lastScan, setLastScan] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
   // ── Weather state ──────────────────────────────────────────────────────────
-  const [weather,     setWeather]     = useState(null);
+  const [weather, setWeather] = useState(null);
   const [weatherLoad, setWeatherLoad] = useState(false);
 
   // ── Notification panel state ───────────────────────────────────────────────
-  const [showNotif,   setShowNotif]   = useState(false);
-  const [notifBadge,  setNotifBadge]  = useState(0);
+  const [showNotif, setShowNotif] = useState(false);
+  const [notifBadge, setNotifBadge] = useState(0);
 
-  const headerFade   = useRef(new Animated.Value(0)).current;
-  const cardSlide    = useRef(new Animated.Value(40)).current;
-  const cardFade     = useRef(new Animated.Value(0)).current;
+  const headerFade = useRef(new Animated.Value(0)).current;
+  const cardSlide = useRef(new Animated.Value(40)).current;
+  const cardFade = useRef(new Animated.Value(0)).current;
 
   // ─── Run entrance animation ─────────────────────────────────────────────────
   useEffect(() => {
     Animated.parallel([
       Animated.timing(headerFade, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(cardFade,   { toValue: 1, duration: 700, delay: 200, useNativeDriver: true }),
-      Animated.timing(cardSlide,  { toValue: 0, duration: 600, delay: 200, useNativeDriver: true }),
+      Animated.timing(cardFade, { toValue: 1, duration: 700, delay: 200, useNativeDriver: true }),
+      Animated.timing(cardSlide, { toValue: 0, duration: 600, delay: 200, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -169,13 +169,13 @@ export default function HomeScreen({ navigation, route }) {
       setWeatherLoad(true);
       try {
         // Step 1: Get lat/lon from IP address (free, no key, no permission)
-        const locRes  = await fetch('https://ip-api.com/json/');
+        const locRes = await fetch('https://ip-api.com/json/');
         const locData = await locRes.json();
         if (!locData.lat) throw new Error('Location unavailable');
 
         // Step 2: Fetch weather from Open-Meteo (free, no key)
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${locData.lat.toFixed(2)}&longitude=${locData.lon.toFixed(2)}&current_weather=true&timezone=Asia%2FKolkata`;
-        const wRes  = await fetch(url);
+        const wRes = await fetch(url);
         const wData = await wRes.json();
         if (wData.current_weather) setWeather(wData.current_weather);
       } catch { /* fail silently — weather is optional */ }
@@ -189,25 +189,25 @@ export default function HomeScreen({ navigation, route }) {
     if (!lastScan) { setNotifBadge(0); return; }
     const alerts = [];
     const ns = lastScan;
-    if (ns.nitrogen        !== null && ns.nitrogen        < 140) alerts.push(1);
-    if (ns.phosphorus      !== null && ns.phosphorus      < 11)  alerts.push(1);
-    if (ns.potassium       !== null && ns.potassium       < 108) alerts.push(1);
-    if (ns.organic_carbon  !== null && ns.organic_carbon  < 0.5) alerts.push(1);
-    if (ns.zinc            !== null && ns.zinc            < 0.6) alerts.push(1);
-    if (ns.ph !== null && (ns.ph < 5.5 || ns.ph > 8.0))          alerts.push(1);
+    if (ns.nitrogen !== null && ns.nitrogen < 140) alerts.push(1);
+    if (ns.phosphorus !== null && ns.phosphorus < 11) alerts.push(1);
+    if (ns.potassium !== null && ns.potassium < 108) alerts.push(1);
+    if (ns.organic_carbon !== null && ns.organic_carbon < 0.5) alerts.push(1);
+    if (ns.zinc !== null && ns.zinc < 0.6) alerts.push(1);
+    if (ns.ph !== null && (ns.ph < 5.5 || ns.ph > 8.0)) alerts.push(1);
     setNotifBadge(alerts.length);
   }, [lastScan]);
 
   // ─── WMO weather code → emoji + description ──────────────────────────────
   const wmoWeather = (code, temp) => {
-    if (code === 0)              return { emoji: '☀️', desc: 'Clear sky' };
-    if (code <= 2)               return { emoji: '⛅', desc: 'Partly cloudy' };
-    if (code === 3)              return { emoji: '☁️', desc: 'Overcast' };
-    if (code <= 48)              return { emoji: '🌫️', desc: 'Foggy' };
-    if (code <= 67)              return { emoji: '🌧️', desc: 'Rainy' };
-    if (code <= 77)              return { emoji: '❄️', desc: 'Snowy' };
-    if (code <= 82)              return { emoji: '🌦️', desc: 'Rain showers' };
-    if (code <= 99)              return { emoji: '⛈️', desc: 'Thunderstorm' };
+    if (code === 0) return { emoji: '☀️', desc: 'Clear sky' };
+    if (code <= 2) return { emoji: '⛅', desc: 'Partly cloudy' };
+    if (code === 3) return { emoji: '☁️', desc: 'Overcast' };
+    if (code <= 48) return { emoji: '🌫️', desc: 'Foggy' };
+    if (code <= 67) return { emoji: '🌧️', desc: 'Rainy' };
+    if (code <= 77) return { emoji: '❄️', desc: 'Snowy' };
+    if (code <= 82) return { emoji: '🌦️', desc: 'Rain showers' };
+    if (code <= 99) return { emoji: '⛈️', desc: 'Thunderstorm' };
     return { emoji: temp > 35 ? '🌡️' : '🌤️', desc: 'Variable' };
   };
 
@@ -219,15 +219,15 @@ export default function HomeScreen({ navigation, route }) {
       return list;
     }
     const ns = lastScan;
-    if (ns.nitrogen       !== null && ns.nitrogen       < 140)
+    if (ns.nitrogen !== null && ns.nitrogen < 140)
       list.push({ id: 2, icon: '🔴', title: 'Nitrogen is LOW', body: `Your N is ${ns.nitrogen} kg/ha. Ideal: ≥140. Apply Urea or DAP this season.` });
-    if (ns.phosphorus     !== null && ns.phosphorus     < 11)
+    if (ns.phosphorus !== null && ns.phosphorus < 11)
       list.push({ id: 3, icon: '🔴', title: 'Phosphorus is LOW', body: `Your P is ${ns.phosphorus} kg/ha. Apply SSP or DAP.` });
-    if (ns.potassium      !== null && ns.potassium      < 108)
+    if (ns.potassium !== null && ns.potassium < 108)
       list.push({ id: 4, icon: '🟠', title: 'Potassium is LOW', body: `Your K is ${ns.potassium} kg/ha. Apply MOP (Muriate of Potash).` });
     if (ns.organic_carbon !== null && ns.organic_carbon < 0.5)
       list.push({ id: 5, icon: '🟠', title: 'Organic Carbon LOW', body: 'Add compost or green manure to improve OC levels.' });
-    if (ns.zinc           !== null && ns.zinc           < 0.6)
+    if (ns.zinc !== null && ns.zinc < 0.6)
       list.push({ id: 6, icon: '🟡', title: 'Zinc Deficient', body: 'Apply Zinc Sulphate @ 25 kg/ha to correct deficiency.' });
     if (ns.ph !== null && (ns.ph < 5.5 || ns.ph > 8.0))
       list.push({ id: 7, icon: '⚠️', title: `pH is ${ns.ph < 5.5 ? 'too Acidic' : 'too Alkaline'}`, body: ns.ph < 5.5 ? 'Apply Agricultural Lime to neutralize acidity.' : 'Apply Gypsum to correct alkalinity.' });
@@ -238,12 +238,12 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   // ─── Greeting based on time ─────────────────────────────────────────────────
-  const hour      = new Date().getHours();
+  const hour = new Date().getHours();
   const greetEmoji = hour < 12 ? '☀️' : hour < 17 ? '🌤️' : '🌙';
-  const firstName  = user?.name?.split(' ')[0] || t('home.greeting_default').replace('नमस्ते, ', '').replace('Hello, ', '');
-  const greeting   = t('home.greeting', { name: firstName });
+  const firstName = user?.name?.split(' ')[0] || t('home.greeting_default').replace('नमस्ते, ', '').replace('Hello, ', '');
+  const greeting = t('home.greeting', { name: firstName });
 
-  const score      = lastScan?.soil_health_score || 0;
+  const score = lastScan?.soil_health_score || 0;
   const scoreColor = getScoreColor(score);
 
   return (
@@ -381,8 +381,8 @@ export default function HomeScreen({ navigation, route }) {
                             lastScan.ph >= 6 && lastScan.ph <= 7.5
                               ? colors.statusGood
                               : lastScan.ph >= 5.5
-                              ? colors.statusFair
-                              : colors.statusPoor,
+                                ? colors.statusFair
+                                : colors.statusPoor,
                         },
                       ]}
                     />
@@ -404,14 +404,14 @@ export default function HomeScreen({ navigation, route }) {
           {/* ── NUTRIENT QUICK BADGES (if scan exists) ─────────────────── */}
           {lastScan && (
             <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('advisory.section_status')}</Text>
+              <Text style={styles.sectionTitle}>{t('advisory.section_status')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.badgeScroll}>
-                <NutrientBadge label="N"  value={lastScan.nitrogen}        unit=" kg/ha" threshold={140} />
-                <NutrientBadge label="P"  value={lastScan.phosphorus}      unit=" kg/ha" threshold={11} />
-                <NutrientBadge label="K"  value={lastScan.potassium}       unit=" kg/ha" threshold={108} />
-                <NutrientBadge label="OC" value={lastScan.organic_carbon}  unit="%"      threshold={0.5} />
-                {lastScan.zinc   && <NutrientBadge label="Zn" value={lastScan.zinc}   unit="" threshold={0.6} />}
-                {lastScan.sulfur && <NutrientBadge label="S"  value={lastScan.sulfur} unit="" threshold={10} />}
+                <NutrientBadge label="N" value={lastScan.nitrogen} unit=" kg/ha" threshold={140} />
+                <NutrientBadge label="P" value={lastScan.phosphorus} unit=" kg/ha" threshold={11} />
+                <NutrientBadge label="K" value={lastScan.potassium} unit=" kg/ha" threshold={108} />
+                <NutrientBadge label="OC" value={lastScan.organic_carbon} unit="%" threshold={0.5} />
+                {lastScan.zinc && <NutrientBadge label="Zn" value={lastScan.zinc} unit="" threshold={0.6} />}
+                {lastScan.sulfur && <NutrientBadge label="S" value={lastScan.sulfur} unit="" threshold={10} />}
               </ScrollView>
             </View>
           )}
@@ -454,11 +454,11 @@ export default function HomeScreen({ navigation, route }) {
               onPress={() =>
                 lastScan
                   ? navigation.navigate('AdvisoryResult', {
-                      advisory:  lastScan,
-                      scan_id:   lastScan.id,
-                      crop:      lastScan.crop,
-                      farmSize:  lastScan.farm_size_acres,
-                    })
+                    advisory: lastScan,
+                    scan_id: lastScan.id,
+                    crop: lastScan.crop,
+                    farmSize: lastScan.farm_size_acres,
+                  })
                   : null
               }
               activeOpacity={lastScan ? 0.85 : 1}

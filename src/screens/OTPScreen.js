@@ -311,7 +311,7 @@ export default function OTPScreen({ navigation, route }) {
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <Text style={[styles.btnText, !complete && styles.btnTextDisabled]}>
-                  {complete ? 'Verify & Login →' : `Enter ${OTP_LENGTH - filled} more digit${OTP_LENGTH - filled !== 1 ? 's' : ''}`}
+                  {complete ? 'Verify & Login' : `Enter ${OTP_LENGTH - filled} more digit${OTP_LENGTH - filled !== 1 ? 's' : ''}`}
                 </Text>
               )}
             </TouchableOpacity>
@@ -373,7 +373,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 20,
     justifyContent: 'flex-end',
-    overflow: 'hidden',
   },
   topBlobTL: {
     position: 'absolute', top: -50, left: -50,
@@ -445,12 +444,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 10,
     marginBottom: 28,
   },
   otpBox: {
     width: BOX_SIZE,
-    height: BOX_SIZE + 8,      // slightly taller than wide
+    height: BOX_SIZE + 8,
     borderWidth: 1.5,
     borderColor: BORDER,
     borderRadius: 12,
@@ -462,6 +460,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
     includeFontPadding: false,
     padding: 0,
+    marginHorizontal: 5,
   },
   otpBoxActive: {
     borderColor: PRIMARY,

@@ -17,62 +17,49 @@ import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../the
 import { sendOTP } from '../services/api';
 
 export default function LoginScreen({ navigation }) {
-  const [phone, setPhone]       = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [focused, setFocused]   = useState(false);
+  const [phone, setPhone]     = useState('');
+  const [loading, setLoading] = useState(false);
+  const [focused, setFocused] = useState(false);
 
-  // Shake animation for invalid input
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(40)).current;
 
-  // Animate in on mount
   React.useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 700,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
   const shakeInput = () => {
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 10,  duration: 60, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 8,   duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8,  duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0,   duration: 60, useNativeDriver: true }),
     ]).start();
   };
 
   const handleSendOTP = async () => {
     const cleaned = phone.trim();
-
     if (cleaned.length !== 10 || isNaN(cleaned)) {
       shakeInput();
-      Alert.alert('Error', 'Please enter a valid 10-digit mobile number.');
+      Alert.alert('Invalid Number', 'Please enter a valid 10-digit mobile number.');
       return;
     }
-
     setLoading(true);
     try {
       const response = await sendOTP(cleaned);
-
       if (response.data.success) {
         navigation.navigate('OTP', {
           phone: cleaned,
-          dev_otp: response.data.dev_otp, // present only if SMS failed (fallback)
+          dev_otp: response.data.dev_otp,
         });
       }
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to send OTP. Is the server running?');
+      Alert.alert('Error', err.message || 'Failed to send OTP. Check your connection.');
     } finally {
       setLoading(false);
     }
@@ -82,13 +69,24 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
 
-      {/* Top decorative band */}
-      <View style={styles.topBand}>
-        <View style={styles.topBandInner} />
+      {/* ── GREEN HEADER BAND (no overflow:hidden so logo floats freely) ── */}
+      <View style={styles.greenBand}>
+        {/* Decorative circle inside band */}
+        <View style={styles.bandCircle1} />
+        <View style={styles.bandCircle2} />
       </View>
 
+      {/* ── LOGO (absolutely positioned, floats above the band boundary) ── */}
+      <View style={styles.logoWrapper}>
+        <View style={styles.logoBox}>
+          <Text style={styles.logoEmoji}>🌱</Text>
+        </View>
+        <Text style={styles.appName}>MittiCard</Text>
+      </View>
+
+      {/* ── SCROLLABLE CONTENT (starts below the logo) ── */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.kav}
@@ -98,173 +96,191 @@ export default function LoginScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Logo & Heading */}
-          <Animated.View
-            style={[
-              styles.header,
-              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-            ]}
-          >
-            <View style={styles.logoMini}>
-              <Text style={styles.logoEmoji}>🌱</Text>
-            </View>
-            <Text style={styles.appTitle}>MittiCard</Text>
+          <Animated.View style={{ opacity: fadeAnim }}>
+
+            {/* Welcome heading */}
             <Text style={styles.welcomeText}>Welcome to MittiCard</Text>
             <Text style={styles.subtitle}>Soil health advisory for Indian farmers</Text>
-          </Animated.View>
 
-          {/* Card */}
-          <Animated.View
-            style={[
-              styles.card,
-              shadows.md,
-              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-            ]}
-          >
-            <Text style={styles.cardTitle}>Sign In</Text>
-            <Text style={styles.cardSubtitle}>Enter your mobile number to continue</Text>
+            {/* ── SIGN IN CARD ── */}
+            <View style={[styles.card, shadows.md]}>
+              <Text style={styles.cardTitle}>Sign In</Text>
+              <Text style={styles.cardSubtitle}>Enter your mobile number to continue</Text>
 
-            {/* Phone Input */}
-            <Text style={styles.label}>Mobile Number</Text>
-            <Animated.View
-              style={[
-                styles.inputWrapper,
-                focused && styles.inputWrapperFocused,
-                { transform: [{ translateX: shakeAnim }] },
-              ]}
-            >
-              {/* Country code */}
-              <View style={styles.countryCode}>
-                <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
-              </View>
+              {/* Label */}
+              <Text style={styles.label}>MOBILE NUMBER</Text>
 
-              <View style={styles.divider} />
+              {/* Phone input with shake animation */}
+              <Animated.View
+                style={[
+                  styles.inputWrapper,
+                  focused && styles.inputWrapperFocused,
+                  { transform: [{ translateX: shakeAnim }] },
+                ]}
+              >
+                {/* Country code */}
+                <View style={styles.countryCode}>
+                  <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
+                </View>
+                <View style={styles.divider} />
 
-              <TextInput
-                style={styles.input}
-                placeholder="98765 43210"
-                placeholderTextColor={colors.placeholder}
-                keyboardType="phone-pad"
-                maxLength={10}
-                value={phone}
-                onChangeText={setPhone}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                returnKeyType="done"
-                onSubmitEditing={handleSendOTP}
-              />
+                <TextInput
+                  style={styles.input}
+                  placeholder="98765 43210"
+                  placeholderTextColor={colors.placeholder}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  value={phone}
+                  onChangeText={setPhone}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSendOTP}
+                />
 
-              {/* Clear button */}
-              {phone.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => setPhone('')}
-                  style={styles.clearBtn}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Text style={styles.clearBtnText}>✕</Text>
-                </TouchableOpacity>
-              )}
-            </Animated.View>
+                {phone.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setPhone('')}
+                    style={styles.clearBtn}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  >
+                    <Text style={styles.clearBtnText}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </Animated.View>
 
-            {/* Character counter */}
-            <Text style={styles.charCount}>{phone.length}/10 digits</Text>
+              {/* Digit counter */}
+              <Text style={styles.charCount}>{phone.length}/10 digits</Text>
 
-            {/* Send OTP Button */}
-            <TouchableOpacity
-              style={[styles.sendBtn, !isReady && styles.sendBtnDisabled]}
-              onPress={handleSendOTP}
-              disabled={loading || !isReady}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.textOnPrimary} size="small" />
-              ) : (
-                <>
-                  <Text style={styles.sendBtnText}>{loading ? 'Sending…' : 'Get OTP via Voice Call'}</Text>
-                  <Text style={styles.sendBtnArrow}> →</Text>
-                </>
-              )}
-            </TouchableOpacity>
+              {/* Send OTP Button */}
+              <TouchableOpacity
+                style={[styles.sendBtn, !isReady && styles.sendBtnDisabled]}
+                onPress={handleSendOTP}
+                disabled={loading || !isReady}
+                activeOpacity={0.85}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={[styles.sendBtnText, !isReady && styles.sendBtnTextDisabled]}>
+                    Get OTP via Voice Call
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Footer */}
+            <Text style={styles.footer}>
+              🔒 Your data is safe · No spam guaranteed
+            </Text>
 
           </Animated.View>
-
-          {/* Footer */}
-          <Animated.Text style={[styles.footer, { opacity: fadeAnim }]}>
-            🔒 Your data is safe · No spam guaranteed
-          </Animated.Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const BAND_HEIGHT   = 200;
+const LOGO_SIZE     = 80;
+const LOGO_OVERLAP  = 44; // how much logo hangs below the band
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
-  topBand: {
-    height: 200,
+
+  // Green header — NO overflow:hidden so logo can float over the edge
+  greenBand: {
+    height: BAND_HEIGHT,
     backgroundColor: colors.primary,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
-    overflow: 'hidden',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
-  topBandInner: {
+  bandCircle1: {
     position: 'absolute',
     top: -60,
-    right: -60,
+    right: -50,
     width: 220,
     height: 220,
     borderRadius: 110,
     backgroundColor: colors.primaryLight,
-    opacity: 0.4,
+    opacity: 0.35,
   },
-  kav: {
-    flex: 1,
-    marginTop: -70,
+  bandCircle2: {
+    position: 'absolute',
+    bottom: -30,
+    left: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.primaryDark,
+    opacity: 0.2,
   },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
-  },
-  header: {
+
+  // Logo floats above the band boundary — zIndex keeps it on top
+  logoWrapper: {
+    position: 'absolute',
+    top: BAND_HEIGHT - LOGO_OVERLAP,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    zIndex: 10,
+    elevation: 10,
   },
-  logoMini: {
-    width: 70,
-    height: 70,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
+  logoBox: {
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    borderRadius: 22,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
     ...shadows.md,
   },
   logoEmoji: {
-    fontSize: 34,
+    fontSize: 38,
   },
-  appTitle: {
-    fontSize: fontSizes.xl,
+  appName: {
+    marginTop: 8,
+    fontSize: fontSizes.lg,
     fontWeight: fontWeights.bold,
-    color: colors.textOnPrimary,
-    marginBottom: 2,
+    color: colors.textPrimary,
   },
+
+  // KAV covers everything below the top of the band
+  kav: {
+    flex: 1,
+  },
+  scroll: {
+    // Push content below: band + logo size + small gap
+    paddingTop: BAND_HEIGHT + LOGO_SIZE - LOGO_OVERLAP + 52,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+
+  // Welcome text
   welcomeText: {
     fontSize: fontSizes.xxl,
     fontWeight: fontWeights.extrabold,
     color: colors.textPrimary,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xs,
+    textAlign: 'center',
+    marginBottom: 6,
   },
   subtitle: {
     fontSize: fontSizes.md,
     color: colors.textSecondary,
     textAlign: 'center',
+    marginBottom: spacing.xl,
     lineHeight: 22,
   },
+
+  // Sign in card
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -282,14 +298,16 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.xl,
   },
+
   label: {
-    fontSize: fontSizes.sm,
+    fontSize: fontSizes.xs,
     fontWeight: fontWeights.semibold,
     color: colors.textSecondary,
     marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
+
+  // Phone input
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -337,42 +355,35 @@ const styles = StyleSheet.create({
   charCount: {
     fontSize: fontSizes.xs,
     color: colors.textMuted,
+    textAlign: 'right',
     marginTop: spacing.xs,
     marginBottom: spacing.lg,
-    textAlign: 'right',
   },
+
+  // Send button
   sendBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
-    paddingVertical: spacing.md + 2,
-    flexDirection: 'row',
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.lg,
+    ...shadows.sm,
   },
   sendBtnDisabled: {
     backgroundColor: colors.border,
+    elevation: 0,
+    shadowOpacity: 0,
   },
   sendBtnText: {
     fontSize: fontSizes.lg,
     fontWeight: fontWeights.bold,
-    color: colors.textOnPrimary,
+    color: '#fff',
     letterSpacing: 0.5,
   },
-  sendBtnArrow: {
-    fontSize: fontSizes.xl,
-    color: colors.textOnPrimary,
-    fontWeight: fontWeights.bold,
-  },
-  devHint: {
-    textAlign: 'center',
-    fontSize: fontSizes.xs,
+  sendBtnTextDisabled: {
     color: colors.textMuted,
   },
-  devOTP: {
-    fontWeight: fontWeights.bold,
-    color: colors.accent,
-  },
+
   footer: {
     textAlign: 'center',
     fontSize: fontSizes.xs,
