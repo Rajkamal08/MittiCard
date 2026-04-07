@@ -195,9 +195,8 @@ export default function LanguageScreen({ navigation, route }) {
           <Text style={styles.continueBtnText}>
             {saving
               ? (selected === 'hi' ? 'सहेज रहे हैं...' : 'Saving...')
-              : (selected === 'hi' ? 'आगे बढ़ें →' : 'Continue →')}
+              : (selected === 'hi' ? 'आगे बढ़ें' : 'Continue')}
           </Text>
-          <Text style={styles.continueBtnArrow}>→</Text>
         </TouchableOpacity>
 
       </Animated.View>
@@ -402,9 +401,5 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     fontWeight: fontWeights.bold,
     color: '#fff',
-  },
-  continueBtnArrow: {
-    fontSize: fontSizes.xl,
-    color: 'rgba(255,255,255,0.8)',
   },
 });

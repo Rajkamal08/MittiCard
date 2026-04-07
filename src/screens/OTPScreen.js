@@ -246,7 +246,7 @@ export default function OTPScreen({ navigation, route }) {
           style={styles.backBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Text style={styles.backBtnText}>Back</Text>
         </TouchableOpacity>
       </View>
 
