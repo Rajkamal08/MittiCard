@@ -78,6 +78,8 @@
     "unit_percent": "%",
     "unit_mg_kg": "mg/kg",
     "crop_label": "फसल चुनें",
+    "crop_placeholder": "फसल चुनने के लिए टैप करें...",
+    "scan_card": "कार्ड स्कैन करें",
     "farm_size": "खेत का आकार",
     "farm_size_unit": "एकड़",
     "sowing_date": "बुवाई की तारीख",

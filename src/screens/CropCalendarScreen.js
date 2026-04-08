@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
 import { getAdvisory } from '../services/api';
+import { useTranslation } from 'react-i18next';
 
 // ─── Event stage emojis ──────────────────────────────────────────────────────
 const STAGE_EMOJI = ['🌱', '💧', '🔍', '🌸', '🌾'];
@@ -45,23 +46,14 @@ const formatSowingDate = dateStr => {
 
 // ─── Timeline Event Card ─────────────────────────────────────────────────────
 function EventCard({ event, index, sowingDate, isLast }) {
+  const { t }     = useTranslation();
   const slideAnim = useRef(new Animated.Value(50)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 400,
-        delay: index * 120,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        delay: index * 120,
-        useNativeDriver: true,
-      }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 400, delay: index * 120, useNativeDriver: true }),
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 400, delay: index * 120, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -69,12 +61,11 @@ function EventCard({ event, index, sowingDate, isLast }) {
   const status    = eventInfo?.status || 'future';
 
   const statusConfig = {
-    done:     { dotColor: colors.textMuted,  cardBg: '#F5F5F5', textColor: colors.textMuted,    badge: 'Done',        badgeBg: '#E8E8E8' },
-    today:    { dotColor: colors.statusGood, cardBg: '#EAF7EF', textColor: colors.statusGood,   badge: 'Today!',      badgeBg: colors.statusGood },
-    upcoming: { dotColor: colors.primary,    cardBg: colors.surface, textColor: colors.textPrimary, badge: null,      badgeBg: null },
-    future:   { dotColor: colors.borderFocus, cardBg: colors.surface, textColor: colors.textPrimary, badge: null,     badgeBg: null },
+    done:     { dotColor: colors.textMuted,    cardBg: '#F5F5F5',        textColor: colors.textMuted,      badge: t('calendar.today').replace('Today','Done'), badgeBg: '#E8E8E8' },
+    today:    { dotColor: colors.statusGood,   cardBg: '#EAF7EF',        textColor: colors.statusGood,     badge: t('calendar.today'),                         badgeBg: colors.statusGood },
+    upcoming: { dotColor: colors.primary,      cardBg: colors.surface,   textColor: colors.textPrimary,    badge: null, badgeBg: null },
+    future:   { dotColor: colors.borderFocus,  cardBg: colors.surface,   textColor: colors.textPrimary,    badge: null, badgeBg: null },
   };
-
   const cfg = statusConfig[status];
 
   return (
@@ -128,13 +119,13 @@ function EventCard({ event, index, sowingDate, isLast }) {
           {eventInfo && status === 'upcoming' && (
             <View style={[styles.countdownBadge]}>
               <Text style={styles.countdownText}>
-                in {eventInfo.daysLeft} days
+                {t('calendar.in_days', { n: eventInfo.daysLeft })}
               </Text>
             </View>
           )}
           {eventInfo && status === 'done' && (
             <Text style={styles.doneAgoText}>
-              {Math.abs(eventInfo.daysLeft)} days ago
+              {t('calendar.days_ago', { n: Math.abs(eventInfo.daysLeft) })}
             </Text>
           )}
         </View>
@@ -157,6 +148,7 @@ function EventCard({ event, index, sowingDate, isLast }) {
 
 // ─── Main CropCalendarScreen ─────────────────────────────────────────────────
 export default function CropCalendarScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const { scan_id, advisory: advisoryParam } = route.params || {};
 
   // crop_calendar may be missing even if advisory was passed (HomeScreen only stores scan summary)
@@ -201,7 +193,7 @@ export default function CropCalendarScreen({ navigation, route }) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading calendar...</Text>
+        <Text style={styles.loadingText}>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -210,9 +202,9 @@ export default function CropCalendarScreen({ navigation, route }) {
     return (
       <View style={styles.center}>
         <Text style={styles.errorEmoji}>📅</Text>
-        <Text style={styles.errorTitle}>{error || 'No data available'}</Text>
+        <Text style={styles.errorTitle}>{error || t('calendar.empty')}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.retryBtnText}>Go Back</Text>
+          <Text style={styles.retryBtnText}>{t('common.back')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -247,23 +239,18 @@ export default function CropCalendarScreen({ navigation, route }) {
           </TouchableOpacity>
 
           <Animated.View style={{ opacity: headerFade }}>
-            <Text style={styles.headerTitle}>📅 Crop Calendar</Text>
+          <Text style={styles.headerTitle}>📅 {t('calendar.title')}</Text>
             <Text style={styles.headerCrop}>
-              {cropLabel} · {calendar.length} events · {totalDays} days total
+              {cropLabel} · {t('calendar.subtitle', { crop: '' }).replace(' for your ', '').trim()} {calendar.length} · {totalDays} days
             </Text>
 
-            {/* Sowing date status */}
             {sowingDate ? (
               <View style={styles.sowingBadge}>
-                <Text style={styles.sowingBadgeText}>
-                  Sown: {formatSowingDate(sowingDate)}
-                </Text>
+                <Text style={styles.sowingBadgeText}>🌱 {formatSowingDate(sowingDate)}</Text>
               </View>
             ) : (
               <View style={[styles.sowingBadge, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-                <Text style={styles.sowingBadgeText}>
-                  No sowing date — enter it next time for countdowns
-                </Text>
+                <Text style={styles.sowingBadgeText}>{t('soil_input.sowing_date_placeholder')}</Text>
               </View>
             )}
 
@@ -303,40 +290,27 @@ export default function CropCalendarScreen({ navigation, route }) {
           {calendar.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>📅</Text>
-              <Text style={styles.emptyTitle}>No calendar available</Text>
-              <Text style={styles.emptySub}>Calendar data for {cropLabel} is coming soon</Text>
+              <Text style={styles.emptyTitle}>{t('calendar.empty')}</Text>
+              <Text style={styles.emptySub}>{cropLabel}</Text>
             </View>
           ) : (
             calendar.map((event, index) => (
-              <EventCard
-                key={index}
-                event={event}
-                index={index}
-                sowingDate={sowingDate}
-                isLast={index === calendar.length - 1}
-              />
+              <EventCard key={index} event={event} index={index} sowingDate={sowingDate} isLast={index === calendar.length - 1} />
             ))
           )}
 
-          {/* ── IMPORTANT NOTE ───────────────────────────────────── */}
           {!sowingDate && (
             <View style={styles.noDateTip}>
               <Text style={styles.noDateTipIcon}>💡</Text>
               <View style={styles.noDateTipText}>
-                <Text style={styles.noDateTipTitle}>Want countdowns?</Text>
-                <Text style={styles.noDateTipBody}>
-                  Enter your sowing date next time you scan. We'll show you exactly how many days until each stage and send you reminders.
-                </Text>
+                <Text style={styles.noDateTipTitle}>{t('soil_input.sowing_date')}</Text>
+                <Text style={styles.noDateTipBody}>{t('soil_input.sowing_date_placeholder')}</Text>
               </View>
             </View>
           )}
 
-          {/* ── BACK TO ADVISORY ─────────────────────────────────── */}
-          <TouchableOpacity
-            style={styles.backToAdvisoryBtn}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backToAdvisoryText}>View Fertilizer Advisory</Text>
+          <TouchableOpacity style={styles.backToAdvisoryBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.backToAdvisoryText}>{t('advisory.go_home')}</Text>
           </TouchableOpacity>
 
         </View>

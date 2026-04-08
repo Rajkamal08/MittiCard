@@ -78,6 +78,8 @@
     "unit_percent": "%",
     "unit_mg_kg": "mg/kg",
     "crop_label": "Select Crop",
+    "crop_placeholder": "Tap to select crop...",
+    "scan_card": "Scan Card",
     "farm_size": "Farm Size",
     "farm_size_unit": "acres",
     "sowing_date": "Sowing Date",

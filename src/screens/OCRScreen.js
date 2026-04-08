@@ -18,16 +18,17 @@ import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
 import { scanImageForOCR, submitOCRSoilData } from '../services/api';
 import { saveLastScanId } from '../services/storage';
+import { useTranslation } from 'react-i18next';
 
-// ─── 7 supported crops ────────────────────────────────────────────────────────
-const CROPS = [
-  { id: 'wheat',     label: 'Wheat',     emoji: '🌾' },
-  { id: 'rice',      label: 'Rice',      emoji: '🍚' },
-  { id: 'maize',     label: 'Maize',     emoji: '🌽' },
-  { id: 'cotton',    label: 'Cotton',    emoji: '🌿' },
-  { id: 'sugarcane', label: 'Sugarcane', emoji: '🎋' },
-  { id: 'soybean',   label: 'Soybean',   emoji: '🫘' },
-  { id: 'groundnut', label: 'Groundnut', emoji: '🥜' },
+// ─── 7 supported crops (translated) ─────────────────────────────────────────
+const getCrops = (t) => [
+  { id: 'wheat',     label: t('crops.wheat').replace(/ ?🌾/, ''),     emoji: '🌾' },
+  { id: 'rice',      label: t('crops.rice').replace(/ ?🍚/, ''),      emoji: '🍚' },
+  { id: 'maize',     label: t('crops.maize').replace(/ ?🌽/, ''),     emoji: '🌽' },
+  { id: 'cotton',    label: t('crops.cotton').replace(/ ?🌿/, ''),    emoji: '🌿' },
+  { id: 'sugarcane', label: t('crops.sugarcane').replace(/ ?🎋/, ''), emoji: '🎋' },
+  { id: 'soybean',   label: t('crops.soybean').replace(/ ?🫘/, ''),   emoji: '🫘' },
+  { id: 'groundnut', label: t('crops.groundnut').replace(/ ?🥜/, ''), emoji: '🥜' },
 ];
 
 // ─── Steps ────────────────────────────────────────────────────────────────────
@@ -47,11 +48,11 @@ function EditableField({ label, value, onChangeText, unit, confidence }) {
         <Text style={styles.editFieldLabel}>{label}</Text>
         {hasValue ? (
           <View style={styles.detectedBadge}>
-            <Text style={styles.detectedText}>Detected</Text>
+            <Text style={styles.detectedText}>{t('ocr.detected')}</Text>
           </View>
         ) : (
           <View style={styles.missingBadge}>
-            <Text style={styles.missingText}>Not found</Text>
+            <Text style={styles.missingText}>{t('ocr.not_found')}</Text>
           </View>
         )}
       </View>
@@ -74,6 +75,8 @@ function EditableField({ label, value, onChangeText, unit, confidence }) {
 
 // ─── Main OCRScreen ───────────────────────────────────────────────────────────
 export default function OCRScreen({ navigation }) {
+  const { t, i18n } = useTranslation();
+  const CROPS = getCrops(t);
   const [step,         setStep]         = useState(STEP_CAPTURE);
   const [imageUri,     setImageUri]     = useState(null);
   const [imageBase64,  setImageBase64]  = useState(null);

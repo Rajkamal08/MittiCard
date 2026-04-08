@@ -17,108 +17,29 @@ import {
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
 import { submitSoilData } from '../services/api';
 import { saveLastScanId } from '../services/storage';
+import { useTranslation } from 'react-i18next';
 
-// ─── 7 supported crops ────────────────────────────────────────────────────────
-const CROPS = [
-  { id: 'wheat',     label: 'Wheat',     emoji: '🌾' },
-  { id: 'rice',      label: 'Rice',      emoji: '🍚' },
-  { id: 'maize',     label: 'Maize',     emoji: '🌽' },
-  { id: 'cotton',    label: 'Cotton',    emoji: '🌿' },
-  { id: 'sugarcane', label: 'Sugarcane', emoji: '🎋' },
-  { id: 'soybean',   label: 'Soybean',   emoji: '🫘' },
-  { id: 'groundnut', label: 'Groundnut', emoji: '🥜' },
+// ─── 7 supported crops (translated via t) ───────────────────────────────────
+const getCrops = (t) => [
+  { id: 'wheat',     label: t('crops.wheat').replace(/ ?🌾/, ''),     emoji: '🌾' },
+  { id: 'rice',      label: t('crops.rice').replace(/ ?🍚/, ''),      emoji: '🍚' },
+  { id: 'maize',     label: t('crops.maize').replace(/ ?🌽/, ''),     emoji: '🌽' },
+  { id: 'cotton',    label: t('crops.cotton').replace(/ ?🌿/, ''),    emoji: '🌿' },
+  { id: 'sugarcane', label: t('crops.sugarcane').replace(/ ?🎋/, ''), emoji: '🎋' },
+  { id: 'soybean',   label: t('crops.soybean').replace(/ ?🫘/, ''),   emoji: '🫘' },
+  { id: 'groundnut', label: t('crops.groundnut').replace(/ ?🥜/, ''), emoji: '🥜' },
 ];
 
-// ─── Nutrient input fields ────────────────────────────────────────────────────
-const NUTRIENT_FIELDS = [
-  {
-    key: 'ph',
-    label: 'pH Level',
-    unit: '',
-    placeholder: 'e.g. 6.5',
-    hint: 'Ideal: 6.0 – 7.5',
-    required: true,
-    min: 0,
-    max: 14,
-    emoji: '⚗️',
-  },
-  {
-    key: 'nitrogen',
-    label: 'Nitrogen (N)',
-    unit: 'kg/ha',
-    placeholder: 'e.g. 180',
-    hint: 'Low if < 140',
-    required: true,
-    min: 0,
-    max: 1000,
-    emoji: '🟦',
-  },
-  {
-    key: 'phosphorus',
-    label: 'Phosphorus (P)',
-    unit: 'kg/ha',
-    placeholder: 'e.g. 15',
-    hint: 'Low if < 11',
-    required: true,
-    min: 0,
-    max: 200,
-    emoji: '🟧',
-  },
-  {
-    key: 'potassium',
-    label: 'Potassium (K)',
-    unit: 'kg/ha',
-    placeholder: 'e.g. 120',
-    hint: 'Low if < 108',
-    required: true,
-    min: 0,
-    max: 1000,
-    emoji: '🟥',
-  },
-  {
-    key: 'organic_carbon',
-    label: 'Organic Carbon',
-    unit: '%',
-    placeholder: 'e.g. 0.65',
-    hint: 'Low if < 0.5%',
-    required: false,
-    min: 0,
-    max: 10,
-    emoji: '🟫',
-  },
-  {
-    key: 'zinc',
-    label: 'Zinc (Zn)',
-    unit: 'ppm',
-    placeholder: 'e.g. 0.8',
-    hint: 'Low if < 0.6',
-    required: false,
-    min: 0,
-    max: 50,
-    emoji: '🔵',
-  },
-  {
-    key: 'sulfur',
-    label: 'Sulfur (S)',
-    unit: 'ppm',
-    placeholder: 'e.g. 12',
-    hint: 'Low if < 10',
-    required: false,
-    min: 0,
-    max: 100,
-    emoji: '🟡',
-  },
-  {
-    key: 'iron',
-    label: 'Iron (Fe)',
-    unit: 'ppm',
-    placeholder: 'e.g. 5.2',
-    hint: 'Low if < 4.5',
-    required: false,
-    min: 0,
-    max: 100,
-    emoji: '⚫',
-  },
+// ─── Nutrient input fields (labels translated) ───────────────────────────────
+const getFields = (t) => [
+  { key: 'ph',             label: t('soil_input.ph'),             unit: '',       placeholder: 'e.g. 6.5',  hint: 'Ideal: 6.0 – 7.5', required: true,  min: 0,  max: 14,   emoji: '⚗️' },
+  { key: 'nitrogen',       label: t('soil_input.nitrogen'),       unit: 'kg/ha',  placeholder: 'e.g. 180',  hint: 'Low if < 140',     required: true,  min: 0,  max: 1000, emoji: '🟦' },
+  { key: 'phosphorus',     label: t('soil_input.phosphorus'),     unit: 'kg/ha',  placeholder: 'e.g. 15',   hint: 'Low if < 11',      required: true,  min: 0,  max: 200,  emoji: '🟧' },
+  { key: 'potassium',      label: t('soil_input.potassium'),      unit: 'kg/ha',  placeholder: 'e.g. 120',  hint: 'Low if < 108',     required: true,  min: 0,  max: 1000, emoji: '🟥' },
+  { key: 'organic_carbon', label: t('soil_input.organic_carbon'), unit: '%',      placeholder: 'e.g. 0.65', hint: 'Low if < 0.5%',    required: false, min: 0,  max: 10,   emoji: '🟫' },
+  { key: 'zinc',           label: t('soil_input.zinc'),           unit: 'ppm',    placeholder: 'e.g. 0.8',  hint: 'Low if < 0.6',     required: false, min: 0,  max: 50,   emoji: '🔵' },
+  { key: 'sulfur',         label: t('soil_input.sulfur'),         unit: 'ppm',    placeholder: 'e.g. 12',   hint: 'Low if < 10',      required: false, min: 0,  max: 100,  emoji: '🟡' },
+  { key: 'iron',           label: t('soil_input.iron'),           unit: 'ppm',    placeholder: 'e.g. 5.2',  hint: 'Low if < 4.5',     required: false, min: 0,  max: 100,  emoji: '⚫' },
 ];
 
 // ─── Crop Picker Modal ────────────────────────────────────────────────────────
@@ -205,6 +126,10 @@ function NutrientInput({ field, value, onChange, error }) {
 
 // ─── Main SoilInputScreen ─────────────────────────────────────────────────────
 export default function SoilInputScreen({ navigation }) {
+  const { t, i18n } = useTranslation();
+  const CROPS        = getCrops(t);
+  const NUTRIENT_FIELDS = getFields(t);
+
   // ── Form state
   const [crop,         setCrop]         = useState('');
   const [farmSize,     setFarmSize]     = useState('');
@@ -235,35 +160,29 @@ export default function SoilInputScreen({ navigation }) {
   // ── Validation
   const validate = () => {
     const newErrors = {};
-
-    if (!crop) newErrors.crop = 'Please select a crop';
+    if (!crop) newErrors.crop = t('soil_input.crop_label') + ' ' + t('common.error').toLowerCase();
     if (!farmSize || isNaN(farmSize) || Number(farmSize) <= 0) {
-      newErrors.farmSize = 'Enter a valid farm size';
+      newErrors.farmSize = t('soil_input.farm_size');
     }
-
-    // Required nutrients
     const requiredKeys = ['ph', 'nitrogen', 'phosphorus', 'potassium'];
     requiredKeys.forEach(key => {
       const val = nutrients[key];
       if (!val || isNaN(val)) {
-        newErrors[key] = 'Required field';
+        newErrors[key] = t('soil_input.error_required').split(',')[0];
       } else {
         const field = NUTRIENT_FIELDS.find(f => f.key === key);
         const num = Number(val);
         if (num < field.min || num > field.max) {
-          newErrors[key] = `Must be between ${field.min} and ${field.max}`;
+          newErrors[key] = `${field.min} – ${field.max}`;
         }
       }
     });
-
-    // Optional nutrients — validate if provided
     ['organic_carbon', 'zinc', 'sulfur', 'iron'].forEach(key => {
       const val = nutrients[key];
       if (val && (isNaN(val) || Number(val) < 0)) {
-        newErrors[key] = 'Enter a valid number';
+        newErrors[key] = t('common.error');
       }
     });
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -271,7 +190,7 @@ export default function SoilInputScreen({ navigation }) {
   // ── Submit
   const handleSubmit = async () => {
     if (!validate()) {
-      Alert.alert('Check your inputs', 'Please fill all required fields correctly.');
+      Alert.alert(t('common.error'), t('soil_input.error_required'));
       return;
     }
 
@@ -289,7 +208,7 @@ export default function SoilInputScreen({ navigation }) {
         zinc:   nutrients.zinc   ? Number(nutrients.zinc)   : null,
         sulfur: nutrients.sulfur ? Number(nutrients.sulfur) : null,
         iron:   nutrients.iron   ? Number(nutrients.iron)   : null,
-        language: 'en',
+        language: i18n.language || 'en',
       };
 
       const response = await submitSoilData(payload);
@@ -342,14 +261,12 @@ export default function SoilInputScreen({ navigation }) {
             onPress={() => navigation.navigate('OCR')}
           >
             <Text style={styles.ocrShortcutEmoji}>📷</Text>
-            <Text style={styles.ocrShortcutText}>Scan Card</Text>
+            <Text style={styles.ocrShortcutText}>{t('soil_input.scan_card')}</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.headerTitle}>🔬 Soil Analysis</Text>
-        <Text style={styles.headerSub}>
-          Enter your Soil Health Card values
-        </Text>
+        <Text style={styles.headerTitle}>🔬 {t('soil_input.title')}</Text>
+        <Text style={styles.headerSub}>{t('soil_input.subtitle')}</Text>
       </View>
 
       <KeyboardAvoidingView
@@ -365,11 +282,11 @@ export default function SoilInputScreen({ navigation }) {
 
             {/* ── SECTION 1: CROP & FARM ─────────────────────────────── */}
             <View style={[styles.card, shadows.sm]}>
-              <Text style={styles.cardTitle}>🌾 Crop & Farm Details</Text>
+              <Text style={styles.cardTitle}>🌾 {t('soil_input.section_farm')}</Text>
 
               {/* Crop Selector */}
               <Text style={styles.fieldLabel}>
-                Crop <Text style={styles.required}>*</Text>
+                {t('soil_input.crop_label')} <Text style={styles.required}>*</Text>
               </Text>
               <TouchableOpacity
                 style={[styles.cropSelector, errors.crop && styles.inputRowError]}
@@ -382,7 +299,7 @@ export default function SoilInputScreen({ navigation }) {
                   </View>
                 ) : (
                   <Text style={styles.cropSelectorPlaceholder}>
-                    Tap to select crop...
+                    {t('soil_input.crop_placeholder')}
                   </Text>
                 )}
                 <Text style={styles.cropSelectorArrow}>▾</Text>
@@ -390,10 +307,9 @@ export default function SoilInputScreen({ navigation }) {
               {errors.crop && <Text style={styles.fieldError}>{errors.crop}</Text>}
 
               <View style={styles.rowInputs}>
-                {/* Farm Size */}
                 <View style={[styles.halfField, styles.halfFieldLeft]}>
                   <Text style={styles.fieldLabel}>
-                    Farm Size <Text style={styles.required}>*</Text>
+                    {t('soil_input.farm_size')} <Text style={styles.required}>*</Text>
                   </Text>
                   <View style={[styles.inputRow, errors.farmSize && styles.inputRowError]}>
                     <TextInput
@@ -404,55 +320,45 @@ export default function SoilInputScreen({ navigation }) {
                       value={farmSize}
                       onChangeText={v => { setFarmSize(v); if (errors.farmSize) setErrors(p => ({...p, farmSize: null})); }}
                     />
-                    <Text style={styles.unitLabel}>acres</Text>
+                    <Text style={styles.unitLabel}>{t('soil_input.farm_size_unit')}</Text>
                   </View>
                   {errors.farmSize && <Text style={styles.fieldError}>{errors.farmSize}</Text>}
                 </View>
 
                 {/* Sowing Date */}
                 <View style={styles.halfField}>
-                  <Text style={styles.fieldLabel}>Sowing Date</Text>
+                  <Text style={styles.fieldLabel}>{t('soil_input.sowing_date')}</Text>
                   <View style={styles.inputRow}>
                     <TextInput
                       style={styles.fieldInput}
-                      placeholder="YYYY-MM-DD"
+                      placeholder={t('soil_input.sowing_date_placeholder')}
                       placeholderTextColor={colors.placeholder}
                       value={sowingDate}
                       onChangeText={setSowingDate}
                       maxLength={10}
                     />
                   </View>
-                  <Text style={styles.optionalTag}>optional</Text>
+                  <Text style={styles.optionalTag}>{t('common.cancel').replace('Cancel','').trim() || 'optional'}</Text>
                 </View>
               </View>
             </View>
 
             {/* ── SECTION 2: REQUIRED NUTRIENTS ─────────────────────── */}
             <View style={[styles.card, shadows.sm]}>
-              <Text style={styles.cardTitle}>📊 Primary Nutrients</Text>
-              <Text style={styles.cardSub}>
-                Found on your Soil Health Card (required)
-              </Text>
+              <Text style={styles.cardTitle}>📊 {t('soil_input.section_nutrients')}</Text>
+              <Text style={styles.cardSub}>{t('soil_input.subtitle')} ({t('soil_input.error_required').split(',')[0]})</Text>
               {NUTRIENT_FIELDS.filter(f => f.required).map(field => (
-                <NutrientInput
-                  key={field.key}
-                  field={field}
-                  value={nutrients[field.key]}
-                  onChange={v => setNutrient(field.key, v)}
-                  error={errors[field.key]}
-                />
+                <NutrientInput key={field.key} field={field} value={nutrients[field.key]} onChange={v => setNutrient(field.key, v)} error={errors[field.key]} />
               ))}
             </View>
 
             {/* ── SECTION 3: OPTIONAL NUTRIENTS ─────────────────────── */}
             <View style={[styles.card, shadows.sm]}>
               <Text style={styles.cardTitle}>
-                🧪 Secondary Nutrients{' '}
+                🧪 {t('soil_input.section_nutrients')}{' '}
                 <Text style={styles.optionalTag}>optional</Text>
               </Text>
-              <Text style={styles.cardSub}>
-                Leave blank if not available on your card
-              </Text>
+              <Text style={styles.cardSub}>Leave blank if not on your card</Text>
               {NUTRIENT_FIELDS.filter(f => !f.required).map(field => (
                 <NutrientInput
                   key={field.key}
@@ -474,16 +380,11 @@ export default function SoilInputScreen({ navigation }) {
               {loading ? (
                 <ActivityIndicator color={colors.textOnPrimary} size="small" />
               ) : (
-                <>
-                  <Text style={styles.submitBtnText}>Get Advisory</Text>
-                  <Text style={styles.submitBtnEmoji}> 🔬</Text>
-                </>
+                <Text style={styles.submitBtnText}>{t('soil_input.submit')} 🔬</Text>
               )}
             </TouchableOpacity>
 
-            <Text style={styles.submitHint}>
-              Result will show fertilizer recommendations,{'\n'}soil health score and crop calendar
-            </Text>
+            <Text style={styles.submitHint}>{t('soil_input.submitting')}</Text>
 
           </Animated.View>
         </ScrollView>
