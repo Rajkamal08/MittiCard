@@ -1,55 +1,49 @@
-// MittiCard — Soil Health Advisory App
-// Color Palette: earthy greens, warm neutrals, deep soil tones
+export const colors = {
+  // Primary brand — deep agricultural green
+  primary:        '#1B5E20',
+  primaryDark:    '#0A3D12',
+  primaryLight:   '#2E7D32',
+  primarySurface: '#E8F5E9',
+  primaryMuted:   '#C8E6C9',
 
-const colors = {
-  // Primary — deep forest green
-  primary: '#2D6A4F',
-  primaryLight: '#40916C',
-  primaryDark: '#1B4332',
+  // Accent — warm amber for CTAs and highlights
+  accent:         '#F9A825',
+  accentDark:     '#F57F17',
+  accentSurface:  '#FFF8E1',
 
-  // Accent — golden harvest
-  accent: '#F4A261',
-  accentLight: '#FFBA6B',
-  accentDark: '#E76F51',
+  // Semantic colors
+  statusGood:     '#2E7D32',
+  statusWarning:  '#E65100',
+  statusPoor:     '#B71C1C',
+  statusInfo:     '#1565C0',
 
   // Backgrounds
-  background: '#F8F5F0',     // warm off-white (like soil paper)
-  surface: '#FFFFFF',
-  surfaceElevated: '#FDFAF6',
+  background:      '#F1F8E9',
+  surface:         '#FFFFFF',
+  surfaceElevated: '#FAFAFA',
+  card:            '#FFFFFF',
+  inputBg:         '#F9FBF9',
+  inputBackground: '#F9FBF9',
 
   // Text
-  textPrimary: '#1A1A2E',
-  textSecondary: '#52526B',
-  textMuted: '#9B9BB0',
+  textPrimary:   '#1A2E1A',
+  textSecondary: '#4A6741',
+  textMuted:     '#7E9B7A',
   textOnPrimary: '#FFFFFF',
-  textOnAccent: '#1A1A2E',
+  textOnAccent:  '#1A1A00',
+  placeholder:   '#A5B9A1',
 
-  // Soil Health Status colors
-  statusGood: '#52B788',      // healthy green
-  statusWarning: '#F4A261',   // caution amber
-  statusPoor: '#E63946',      // deficient red
-  statusFair: '#FFBA08',      // fair yellow
+  // Borders
+  border:       '#D7E8D4',
+  borderFocus:  '#2E7D32',
+  borderStrong: '#A5C8A0',
+  divider:      '#EAF2E8',
 
-  // Utility
-  border: '#E8E4DE',
-  borderFocus: '#2D6A4F',
-  inputBackground: '#F4F1EC',
-  placeholder: '#B0ADA8',
-
-  // OTP Box
-  otpBorder: '#D0CCC5',
-  otpBorderActive: '#2D6A4F',
-  otpBackground: '#FAFAFA',
-
-  // Score gradient stops
-  scoreLow: '#E63946',
-  scoreMid: '#FFBA08',
-  scoreHigh: '#52B788',
-
-  // Shadows / Overlay
-  shadow: 'rgba(45, 106, 79, 0.12)',
-  overlay: 'rgba(0, 0, 0, 0.45)',
-  shimmer: '#F0EDE8',
+  // Nutrient status badges
+  badgeLow:        '#FFEBEE',
+  badgeLowText:    '#C62828',
+  badgeMedium:     '#FFF3E0',
+  badgeMediumText: '#E65100',
+  badgeGood:       '#E8F5E9',
+  badgeGoodText:   '#2E7D32',
 };
-
-export default colors;

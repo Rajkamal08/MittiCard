@@ -1,14 +1,9 @@
 import axios from 'axios';
 
-// ─── BASE URL — change this depending on where you're running ───────────────
-// LOCAL DEVELOPMENT (USB + adb reverse):
-//   adb reverse tcp:8081 tcp:8081
-//   adb reverse tcp:5000 tcp:5000
-//   const BASE_URL = 'http://localhost:5000';
-//
-// PRODUCTION (Render deployed backend):
+// ─── BASE URL ─────────────────────────────────────────────────────────────────
+// Backend is deployed on Render — always use this URL
+// (App runs on real device, not emulator, so localhost doesn't apply)
 const BASE_URL = 'https://mitticard-backend.onrender.com';
-
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -63,7 +58,7 @@ export const sendOTP = phone =>
   api.post('/auth/send-otp', { phone });
 
 export const verifyOTP = (phone, otp, name) =>
-  api.post('/auth/verify-otp', { phone, otp, name, role: 'farmer' });
+  api.post('/auth/verify-otp', { phone, otp, name }); // role always 'farmer', set by backend
 
 export const getMe = () =>
   api.get('/auth/me');
@@ -100,4 +95,7 @@ export const getFPODistrictFarms = () =>
 export const addFarmToFPO = (farm_id) =>
   api.post('/fpo/members', { farm_id });
 
+export { api };
 export default api;
+
+

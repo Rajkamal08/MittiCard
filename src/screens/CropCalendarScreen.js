@@ -1,595 +1,361 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-  Animated,
-  ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, StatusBar,
+  Platform, ScrollView, Animated, ActivityIndicator,
+  Alert, Modal,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
-import { getAdvisory } from '../services/api';
+import { getAdvisory, setSowingDate } from '../services/api';
 import { useTranslation } from 'react-i18next';
 
-// ─── Event stage emojis ──────────────────────────────────────────────────────
-const STAGE_EMOJI = ['🌱', '💧', '🔍', '🌸', '🌾'];
+const STATUS_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44;
 
-// ─── Event Status ────────────────────────────────────────────────────────────
-const getEventStatus = (daysAfterSowing, sowingDate) => {
-  if (!sowingDate) return 'future';
-  const sow    = new Date(sowingDate);
-  const event  = new Date(sow);
-  event.setDate(sow.getDate() + daysAfterSowing);
-  const today  = new Date();
-  today.setHours(0, 0, 0, 0);
-  event.setHours(0, 0, 0, 0);
-
-  const diffDays = Math.round((event - today) / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0)  return { status: 'done',     daysLeft: diffDays,    eventDate: event };
-  if (diffDays === 0) return { status: 'today',    daysLeft: 0,           eventDate: event };
-  return               { status: 'upcoming',    daysLeft: diffDays,    eventDate: event };
+const daysBetween = (a, b) => {
+  const ms = new Date(b) - new Date(a);
+  return Math.round(ms / 86400000);
 };
 
-const formatDate = date => {
-  if (!date) return '';
-  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+const eventStatus = (evDate, sowDate) => {
+  if (!evDate) return 'unknown';
+  const today = new Date();
+  const ev    = new Date(evDate);
+  const diff  = daysBetween(today, ev);
+  if (diff < -1)  return 'done';
+  if (diff <= 1)  return 'today';
+  return 'upcoming';
 };
 
-const formatSowingDate = dateStr => {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+const statusStyle = status => {
+  if (status === 'done')    return { dot: colors.statusGood,    badge: colors.badgeGood,    text: colors.badgeGoodText,    label: 'Completed' };
+  if (status === 'today')   return { dot: colors.accent,        badge: colors.accentSurface, text: colors.accentDark,       label: 'Today!' };
+  return                           { dot: colors.border,        badge: '#F0F0F0',            text: '#666',                  label: null };
 };
 
-// ─── Timeline Event Card ─────────────────────────────────────────────────────
-function EventCard({ event, index, sowingDate, isLast }) {
-  const { t }     = useTranslation();
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(slideAnim, { toValue: 0, duration: 400, delay: index * 120, useNativeDriver: true }),
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 400, delay: index * 120, useNativeDriver: true }),
-    ]).start();
-  }, []);
-
-  const eventInfo = sowingDate ? getEventStatus(event.days_after_sowing, sowingDate) : null;
-  const status    = eventInfo?.status || 'future';
-
-  const statusConfig = {
-    done:     { dotColor: colors.textMuted,    cardBg: '#F5F5F5',        textColor: colors.textMuted,      badge: t('calendar.today').replace('Today','Done'), badgeBg: '#E8E8E8' },
-    today:    { dotColor: colors.statusGood,   cardBg: '#EAF7EF',        textColor: colors.statusGood,     badge: t('calendar.today'),                         badgeBg: colors.statusGood },
-    upcoming: { dotColor: colors.primary,      cardBg: colors.surface,   textColor: colors.textPrimary,    badge: null, badgeBg: null },
-    future:   { dotColor: colors.borderFocus,  cardBg: colors.surface,   textColor: colors.textPrimary,    badge: null, badgeBg: null },
-  };
-  const cfg = statusConfig[status];
-
-  return (
-    <Animated.View
-      style={[
-        styles.eventRow,
-        { opacity: fadeAnim, transform: [{ translateX: slideAnim }] },
-      ]}
-    >
-      {/* Timeline line + dot */}
-      <View style={styles.timelineCol}>
-        <View
-          style={[
-            styles.timelineDot,
-            {
-              backgroundColor: status === 'done' ? colors.textMuted : cfg.dotColor,
-              borderColor: cfg.dotColor,
-              borderWidth: status === 'future' ? 2 : 0,
-            },
-          ]}
-        >
-          <Text style={styles.timelineDotIndex}>{index + 1}</Text>
-        </View>
-        {!isLast && (
-          <View
-            style={[
-              styles.timelineLine,
-              { backgroundColor: status === 'done' ? colors.textMuted : colors.border },
-            ]}
-          />
-        )}
-      </View>
-
-      {/* Card */}
-      <View style={[styles.eventCard, { backgroundColor: cfg.cardBg }, shadows.sm]}>
-        {/* Day + date */}
-        <View style={styles.eventCardHeader}>
-          <View style={styles.dayBadge}>
-            <Text style={styles.dayBadgeEmoji}>{STAGE_EMOJI[index] || '📌'}</Text>
-            <Text style={styles.dayBadgeText}>Day {event.days_after_sowing}</Text>
-          </View>
-
-          {/* Status badge */}
-          {cfg.badge && (
-            <View style={[styles.statusBadge, { backgroundColor: cfg.badgeBg }]}>
-              <Text style={styles.statusBadgeText}>{cfg.badge}</Text>
-            </View>
-          )}
-
-          {/* Countdown */}
-          {eventInfo && status === 'upcoming' && (
-            <View style={[styles.countdownBadge]}>
-              <Text style={styles.countdownText}>
-                {t('calendar.in_days', { n: eventInfo.daysLeft })}
-              </Text>
-            </View>
-          )}
-          {eventInfo && status === 'done' && (
-            <Text style={styles.doneAgoText}>
-              {t('calendar.days_ago', { n: Math.abs(eventInfo.daysLeft) })}
-            </Text>
-          )}
-        </View>
-
-        {/* Label */}
-        <Text style={[styles.eventLabel, { color: cfg.textColor }]}>
-          {event.label}
-        </Text>
-
-        {/* Actual date (if sowing date known) */}
-        {eventInfo?.eventDate && (
-          <Text style={[styles.eventDate, { color: cfg.textColor, opacity: 0.65 }]}>
-            {formatDate(eventInfo.eventDate)}
-          </Text>
-        )}
-      </View>
-    </Animated.View>
-  );
-}
-
-// ─── Main CropCalendarScreen ─────────────────────────────────────────────────
-export default function CropCalendarScreen({ navigation, route }) {
+export default function CropCalendarScreen({ route, navigation }) {
   const { t } = useTranslation();
-  const { scan_id, advisory: advisoryParam } = route.params || {};
+  const { scan_id, advisory: advisoryParam, sowing_date: sowParam } = route.params || {};
 
-  // crop_calendar may be missing even if advisory was passed (HomeScreen only stores scan summary)
-  // So: if advisory exists but has no crop_calendar, still fetch from API
-  const needsFetch = !advisoryParam || !advisoryParam.crop_calendar;
-  const [advisory,  setAdvisory]  = useState(advisoryParam && advisoryParam.crop_calendar ? advisoryParam : null);
-  const [loading,   setLoading]   = useState(needsFetch);
-  const [error,     setError]     = useState(null);
+  const [advisory,  setAdvisory]  = useState(advisoryParam || null);
+  const [loading,   setLoading]   = useState(!advisoryParam);
+  const [sowDate,   setSowDate]   = useState(sowParam || advisory?.sowing_date || null);
+  const [showPicker,setShowPicker]= useState(false);
+  const [pDay,      setPDay]      = useState(new Date().getDate());
+  const [pMonth,    setPMonth]    = useState(new Date().getMonth() + 1);
+  const [pYear,     setPYear]     = useState(new Date().getFullYear());
+  const [saving,    setSaving]    = useState(false);
 
-  const headerFade = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    Animated.timing(headerFade, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-  }, []);
-
-  // Fetch advisory when: no advisory passed, OR advisory has no crop_calendar
-  useEffect(() => {
-    if (needsFetch && scan_id) {
-      const fetchAdvisory = async () => {
-        try {
-          const res = await getAdvisory(scan_id);
-          if (res.data.success) {
-            setAdvisory(res.data.data);
-          } else {
-            setError('Could not load calendar data');
-          }
-        } catch {
-          setError('Could not connect to server');
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchAdvisory();
-    } else if (needsFetch && !scan_id) {
-      // No scan_id passed — can't fetch, show error instead of hanging
-      setError('No scan data found. Please scan a soil card first.');
+  const loadAdvisory = useCallback(async () => {
+    if (!scan_id) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const res = await getAdvisory(scan_id);
+      if (res.data?.success) {
+        const d = res.data.data;
+        setAdvisory(d);
+        if (d.sowing_date) setSowDate(d.sowing_date);
+      }
+    } catch {
+      Alert.alert('Error', 'Could not load calendar. Check your internet.');
+    } finally {
       setLoading(false);
     }
   }, [scan_id]);
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>{t('common.loading')}</Text>
-      </View>
-    );
-  }
+  useFocusEffect(useCallback(() => {
+    if (!advisoryParam) loadAdvisory();
+    Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, []));
 
-  if (error || !advisory) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorEmoji}>📅</Text>
-        <Text style={styles.errorTitle}>{error || t('calendar.empty')}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.retryBtnText}>{t('common.back')}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const confirmSowDate = async () => {
+    const iso = `${pYear}-${String(pMonth).padStart(2,'0')}-${String(pDay).padStart(2,'0')}`;
+    setSaving(true);
+    try {
+      if (scan_id) await setSowingDate(scan_id, iso);
+      setSowDate(iso);
+      setShowPicker(false);
+      if (scan_id) loadAdvisory();
+    } catch {
+      Alert.alert('Error', 'Could not save sowing date.');
+    } finally {
+      setSaving(false); }
+  };
 
-  const calendar    = advisory.crop_calendar || [];
-  const crop        = advisory.crop || '';
-  const cropLabel   = crop.charAt(0).toUpperCase() + crop.slice(1);
-  const sowingDate  = advisory.sowing_date || null;
-  const totalDays   = calendar.length > 0 ? calendar[calendar.length - 1].days_after_sowing : 0;
+  const calendar = advisory?.crop_calendar || [];
+  const crop     = advisory?.crop          || '';
+  const farmSize = advisory?.farm_size_acres || '';
 
-  // Count events by status
-  const statusCounts = calendar.reduce((acc, ev) => {
-    const info = sowingDate ? getEventStatus(ev.days_after_sowing, sowingDate) : null;
-    const s    = info?.status || 'future';
-    acc[s]     = (acc[s] || 0) + 1;
-    return acc;
-  }, {});
+  const totalEvents    = calendar.length;
+  const upcomingEvents = calendar.filter(e => eventStatus(e.event_date) !== 'done').length;
+
+  const formatDate = iso => {
+    if (!iso) return '–';
+    const d = new Date(iso + 'T00:00:00Z');
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  };
 
   return (
-    <View style={styles.container}>
+    <View style={st.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      {/* Header */}
+      <View style={st.header}>
+        <View style={st.blob} />
+        <TouchableOpacity style={st.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={st.backText}>{'\u2190'} Back</Text>
+        </TouchableOpacity>
+        <Text style={st.headerTitle}>{'\u{1F4C5}'} {t('crop_calendar.title') || 'Crop Calendar'}</Text>
+        <Text style={st.headerSub}>
+          {crop ? crop.charAt(0).toUpperCase() + crop.slice(1) : ''}
+          {totalEvents > 0 ? `  \u00B7  ${totalEvents} events` : ''}
+          {farmSize ? `  \u00B7  ${farmSize} acres` : ''}
+        </Text>
 
-        {/* ── HEADER ────────────────────────────────────────────────── */}
-        <View style={styles.header}>
-          <View style={styles.headerBubble} />
+        {/* Sowing date pill */}
+        <TouchableOpacity style={st.sowPill} onPress={() => setShowPicker(true)}>
+          <Text style={st.sowPillEmoji}>{'\u{1F331}'}</Text>
+          <Text style={st.sowPillText}>
+            {sowDate ? formatDate(sowDate) : 'Set Sowing Date'}
+          </Text>
+          <Text style={st.sowPillEdit}>{sowDate ? '\u270F\uFE0F' : '+'}</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
+        {upcomingEvents > 0 && (
+          <View style={st.upcomingBadge}>
+            <Text style={st.upcomingText}>{upcomingEvents} upcoming</Text>
+          </View>
+        )}
+      </View>
 
-          <Animated.View style={{ opacity: headerFade }}>
-          <Text style={styles.headerTitle}>📅 {t('calendar.title')}</Text>
-            <Text style={styles.headerCrop}>
-              {cropLabel} · {t('calendar.subtitle', { crop: '' }).replace(' for your ', '').trim()} {calendar.length} · {totalDays} days
-            </Text>
-
-            {sowingDate ? (
-              <View style={styles.sowingBadge}>
-                <Text style={styles.sowingBadgeText}>🌱 {formatSowingDate(sowingDate)}</Text>
-              </View>
-            ) : (
-              <View style={[styles.sowingBadge, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-                <Text style={styles.sowingBadgeText}>{t('soil_input.sowing_date_placeholder')}</Text>
-              </View>
-            )}
-
-            {/* Progress summary (only if sowing date set) */}
-            {sowingDate && (
-              <View style={styles.progressRow}>
-                {statusCounts.done > 0 && (
-                  <View style={styles.progressChip}>
-                    <Text style={styles.progressChipText}>
-                      {statusCounts.done} done
-                    </Text>
-                  </View>
-                )}
-                {statusCounts.today > 0 && (
-                  <View style={[styles.progressChip, { backgroundColor: colors.statusGood }]}>
-                    <Text style={[styles.progressChipText, { color: '#fff' }]}>
-                      1 today!
-                    </Text>
-                  </View>
-                )}
-                {statusCounts.upcoming > 0 && (
-                  <View style={[styles.progressChip, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
-                    <Text style={styles.progressChipText}>
-                      {statusCounts.upcoming} upcoming
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </Animated.View>
+      {loading ? (
+        <View style={st.loadingBox}>
+          <ActivityIndicator color={colors.primary} size="large" />
+          <Text style={st.loadingText}>Loading calendar…</Text>
         </View>
-
-        {/* ── TIMELINE ──────────────────────────────────────────────── */}
-        <View style={styles.timelineSection}>
-
-          {/* No events fallback */}
-          {calendar.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyEmoji}>📅</Text>
-              <Text style={styles.emptyTitle}>{t('calendar.empty')}</Text>
-              <Text style={styles.emptySub}>{cropLabel}</Text>
-            </View>
-          ) : (
-            calendar.map((event, index) => (
-              <EventCard key={index} event={event} index={index} sowingDate={sowingDate} isLast={index === calendar.length - 1} />
-            ))
+      ) : calendar.length === 0 ? (
+        <View style={st.emptyBox}>
+          <Text style={st.emptyEmoji}>{'\u{1F4C5}'}</Text>
+          <Text style={st.emptyTitle}>No Calendar Data</Text>
+          <Text style={st.emptySub}>
+            {sowDate
+              ? 'No events found. Try re-generating your advisory.'
+              : 'Set your sowing date to generate a crop schedule.'}
+          </Text>
+          {!sowDate && (
+            <TouchableOpacity style={st.emptyBtn} onPress={() => setShowPicker(true)}>
+              <Text style={st.emptyBtnText}>{'\u{1F4C5}'} Set Sowing Date</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : (
+        <Animated.ScrollView
+          style={{ opacity: fade }}
+          contentContainerStyle={st.scroll}
+          showsVerticalScrollIndicator={false}
+        >
+          {!sowDate && (
+            <TouchableOpacity style={[st.setSowBanner, shadows.sm]} onPress={() => setShowPicker(true)}>
+              <Text style={st.setSowBannerText}>{'\u{1F331}'} Set your sowing date to see exact dates</Text>
+              <Text style={st.setSowBannerCta}>Set Now {'\u2192'}</Text>
+            </TouchableOpacity>
           )}
 
-          {!sowingDate && (
-            <View style={styles.noDateTip}>
-              <Text style={styles.noDateTipIcon}>💡</Text>
-              <View style={styles.noDateTipText}>
-                <Text style={styles.noDateTipTitle}>{t('soil_input.sowing_date')}</Text>
-                <Text style={styles.noDateTipBody}>{t('soil_input.sowing_date_placeholder')}</Text>
+          {/* Timeline */}
+          <View style={st.timeline}>
+            {/* Vertical line */}
+            <View style={st.timelineLine} />
+
+            {calendar.map((ev, idx) => {
+              const evDate = ev.event_date;
+              const status = eventStatus(evDate, sowDate);
+              const ss     = statusStyle(status);
+              const label  = ev.label || ev.event_label || 'Event';
+              const days   = ev.days_after_sowing;
+              const diff   = evDate ? daysBetween(new Date(), new Date(evDate)) : null;
+
+              return (
+                <View key={idx} style={st.eventWrap}>
+                  {/* Dot on timeline */}
+                  <View style={[st.dot, { backgroundColor: ss.dot }]}>
+                    {status === 'today' && <View style={st.dotPulse} />}
+                  </View>
+
+                  {/* Event card */}
+                  <View style={[st.eventCard, shadows.sm, { borderLeftColor: ss.dot }]}>
+                    <View style={st.eventHeader}>
+                      <Text style={st.eventLabel} numberOfLines={2}>{label}</Text>
+                      {/* Countdown */}
+                      {diff !== null && (
+                        <View style={[st.countBadge, { backgroundColor: ss.badge }]}>
+                          <Text style={[st.countText, { color: ss.text }]}>
+                            {status === 'done'  ? 'Completed'
+                            : status === 'today' ? 'Today!'
+                            : `In ${diff} days`}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Date */}
+                    <Text style={st.eventDate}>
+                      {evDate ? formatDate(evDate)
+                        : days != null ? `Day ${days} after sowing`
+                        : '–'}
+                    </Text>
+
+                    {/* Reminder status */}
+                    <Text style={st.reminderStatus}>
+                      {ev.reminder_sent
+                        ? '\u2705 Reminder sent'
+                        : '\u{1F514} Reminder pending'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </Animated.ScrollView>
+      )}
+
+      {/* ── Sowing Date Picker Modal ─────────────────────────────────────── */}
+      <Modal visible={showPicker} transparent animationType="slide" onRequestClose={() => setShowPicker(false)}>
+        <View style={st.dpOverlay}>
+          <View style={st.dpSheet}>
+            <View style={st.dpHandle} />
+            <Text style={st.dpTitle}>{'\u{1F331}'} Set Sowing Date</Text>
+            <Text style={st.dpSub}>When did / will you sow seeds?</Text>
+
+            <View style={st.dpCols}>
+              {/* Day */}
+              <View style={{ flex: 1 }}>
+                <Text style={st.dpColLabel}>Day</Text>
+                <ScrollView style={st.dpScroll} snapToInterval={44} decelerationRate="fast" showsVerticalScrollIndicator={false}>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                    <TouchableOpacity key={d} style={[st.dpItem, pDay===d && st.dpItemActive]} onPress={() => setPDay(d)}>
+                      <Text style={[st.dpItemText, pDay===d && st.dpItemTextActive]}>{String(d).padStart(2,'0')}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+              {/* Month */}
+              <View style={{ flex: 1.6 }}>
+                <Text style={st.dpColLabel}>Month</Text>
+                <ScrollView style={st.dpScroll} snapToInterval={44} decelerationRate="fast" showsVerticalScrollIndicator={false}>
+                  {MONTHS.map((m, i) => (
+                    <TouchableOpacity key={i} style={[st.dpItem, pMonth===i+1 && st.dpItemActive]} onPress={() => setPMonth(i+1)}>
+                      <Text style={[st.dpItemText, pMonth===i+1 && st.dpItemTextActive]}>{m}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+              {/* Year */}
+              <View style={{ flex: 1 }}>
+                <Text style={st.dpColLabel}>Year</Text>
+                <ScrollView style={st.dpScroll} snapToInterval={44} decelerationRate="fast" showsVerticalScrollIndicator={false}>
+                  {[2024,2025,2026,2027,2028].map(y => (
+                    <TouchableOpacity key={y} style={[st.dpItem, pYear===y && st.dpItemActive]} onPress={() => setPYear(y)}>
+                      <Text style={[st.dpItemText, pYear===y && st.dpItemTextActive]}>{y}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
             </View>
-          )}
 
-          <TouchableOpacity style={styles.backToAdvisoryBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backToAdvisoryText}>{t('advisory.go_home')}</Text>
-          </TouchableOpacity>
+            <View style={st.dpPreview}>
+              <Text style={st.dpPreviewLabel}>Selected: </Text>
+              <Text style={st.dpPreviewDate}>{String(pDay).padStart(2,'0')}/{String(pMonth).padStart(2,'0')}/{pYear}</Text>
+            </View>
 
+            <View style={st.dpBtns}>
+              <TouchableOpacity style={st.dpCancel} onPress={() => setShowPicker(false)}>
+                <Text style={st.dpCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[st.dpConfirm, saving && { opacity: 0.7 }]} onPress={confirmSowDate} disabled={saving}>
+                {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={st.dpConfirmText}>{'\u2713'} Confirm</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      </ScrollView>
+      </Modal>
     </View>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-
-  // Loading / error state
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-    gap: spacing.md,
-    padding: spacing.xl,
-  },
-  loadingText: {
-    fontSize: fontSizes.md,
-    color: colors.textSecondary,
-  },
-  errorEmoji: { fontSize: 48 },
-  errorTitle: {
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold,
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
-  retryBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    marginTop: spacing.md,
-  },
-  retryBtnText: {
-    color: '#fff',
-    fontWeight: fontWeights.bold,
-    fontSize: fontSizes.md,
-  },
-
-  // Header
+const st = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
-    backgroundColor: colors.primary,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl + spacing.xl,
-    paddingHorizontal: spacing.lg,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    overflow: 'hidden',
-    gap: spacing.sm,
+    backgroundColor: colors.primary, paddingTop: STATUS_HEIGHT + 12,
+    paddingBottom: spacing.xl, paddingHorizontal: spacing.lg,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden',
   },
-  headerBubble: {
-    position: 'absolute',
-    top: -60,
-    right: -50,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: colors.primaryLight,
-    opacity: 0.3,
-  },
-  backBtn: { marginBottom: spacing.xs },
-  backText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
-  },
-  headerTitle: {
-    fontSize: fontSizes.xxl,
-    fontWeight: fontWeights.extrabold,
-    color: colors.textOnPrimary,
-    marginBottom: 4,
-  },
-  headerCrop: {
-    fontSize: fontSizes.md,
-    color: 'rgba(255,255,255,0.75)',
-    marginBottom: spacing.sm,
-  },
+  blob: { position: 'absolute', top: -50, right: -40, width: 160, height: 160, borderRadius: 80, backgroundColor: colors.primaryLight, opacity: 0.25 },
+  backBtn: { alignSelf: 'flex-start', marginBottom: spacing.sm, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.sm },
+  backText: { color: '#fff', fontSize: fontSizes.sm, fontWeight: fontWeights.semibold },
+  headerTitle: { fontSize: 26, fontWeight: fontWeights.extrabold, color: '#fff', marginBottom: 4 },
+  headerSub: { fontSize: fontSizes.sm, color: 'rgba(255,255,255,0.75)', marginBottom: spacing.sm },
+  sowPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 7, marginBottom: spacing.sm },
+  sowPillEmoji: { fontSize: 16 },
+  sowPillText: { fontSize: fontSizes.sm, color: '#fff', fontWeight: fontWeights.semibold },
+  sowPillEdit: { fontSize: 14, color: 'rgba(255,255,255,0.7)' },
+  upcomingBadge: { alignSelf: 'flex-start', backgroundColor: colors.accent, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4 },
+  upcomingText: { fontSize: fontSizes.xs, fontWeight: fontWeights.bold, color: colors.textOnAccent },
 
-  // Sowing date badge
-  sowingBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  sowingBadgeText: {
-    color: '#fff',
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.medium,
-  },
+  scroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
+  loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  loadingText: { fontSize: fontSizes.sm, color: colors.textMuted },
 
-  // Progress chips
-  progressRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  progressChip: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  progressChipText: {
-    color: '#fff',
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.bold,
-  },
+  emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl },
+  emptyEmoji: { fontSize: 56, marginBottom: spacing.lg },
+  emptyTitle: { fontSize: fontSizes.xl, fontWeight: fontWeights.bold, color: colors.textPrimary, marginBottom: spacing.sm },
+  emptySub: { fontSize: fontSizes.sm, color: colors.textMuted, textAlign: 'center', marginBottom: spacing.xl },
+  emptyBtn: { backgroundColor: colors.primary, borderRadius: radius.lg, paddingVertical: 14, paddingHorizontal: spacing.xxl, ...shadows.sm },
+  emptyBtnText: { fontSize: fontSizes.md, fontWeight: fontWeights.bold, color: '#fff' },
 
-  // Timeline section
-  timelineSection: {
-    marginTop: -spacing.xl,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
-    paddingTop: spacing.xl,
-    gap: 0,
-  },
+  setSowBanner: { backgroundColor: colors.primarySurface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.primaryMuted, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  setSowBannerText: { fontSize: fontSizes.sm, color: colors.primary, fontWeight: fontWeights.medium, flex: 1 },
+  setSowBannerCta: { fontSize: fontSizes.sm, fontWeight: fontWeights.bold, color: colors.primary },
 
-  // Event row (dot + card)
-  eventRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: 0,
-  },
-
-  // Timeline left column
-  timelineCol: {
-    alignItems: 'center',
-    width: 36,
-  },
-  timelineDot: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  timelineDotIndex: {
-    color: '#fff',
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.extrabold,
-  },
-  timelineLine: {
-    width: 2,
-    flex: 1,
-    minHeight: 24,
-    marginVertical: 4,
-  },
-
-  // Event card
+  // Timeline
+  timeline: { position: 'relative', paddingLeft: 28 },
+  timelineLine: { position: 'absolute', left: 11, top: 16, bottom: 16, width: 2, backgroundColor: colors.primaryMuted },
+  eventWrap: { flexDirection: 'row', marginBottom: spacing.md, alignItems: 'flex-start' },
+  dot: { width: 14, height: 14, borderRadius: 7, position: 'absolute', left: -21, top: 14, zIndex: 1 },
+  dotPulse: { position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: colors.accent, opacity: 0.3, top: -4, left: -4 },
   eventCard: {
-    flex: 1,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    gap: 6,
+    flex: 1, backgroundColor: colors.surface, borderRadius: radius.md,
+    padding: spacing.md, borderLeftWidth: 3, borderLeftColor: colors.primary,
+    borderWidth: 1, borderColor: colors.border,
   },
-  eventCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  dayBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  dayBadgeEmoji: { fontSize: 16 },
-  dayBadgeText: {
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.extrabold,
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  statusBadge: {
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  statusBadgeText: {
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.extrabold,
-    color: '#fff',
-  },
-  countdownBadge: {
-    backgroundColor: colors.primary + '18',
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  countdownText: {
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.bold,
-    color: colors.primary,
-  },
-  doneAgoText: {
-    fontSize: fontSizes.xs,
-    color: colors.textMuted,
-    fontStyle: 'italic',
-  },
-  eventLabel: {
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.semibold,
-    lineHeight: 22,
-  },
-  eventDate: {
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.medium,
-  },
+  eventHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm, marginBottom: 4 },
+  eventLabel: { flex: 1, fontSize: fontSizes.sm, fontWeight: fontWeights.semibold, color: colors.textPrimary },
+  countBadge: { borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
+  countText: { fontSize: fontSizes.xs, fontWeight: fontWeights.bold },
+  eventDate: { fontSize: fontSizes.xs, color: colors.textMuted, marginBottom: 4 },
+  reminderStatus: { fontSize: fontSizes.xs, color: colors.textMuted },
 
-  // Empty state
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
-    gap: spacing.sm,
-  },
-  emptyEmoji: { fontSize: 48 },
-  emptyTitle: {
-    fontSize: fontSizes.xl,
-    fontWeight: fontWeights.bold,
-    color: colors.textPrimary,
-  },
-  emptySub: {
-    fontSize: fontSizes.md,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-
-  // No date tip
-  noDateTip: {
-    backgroundColor: '#FFF8EC',
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    gap: spacing.md,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.accent,
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  noDateTipIcon: { fontSize: 22 },
-  noDateTipText: { flex: 1, gap: 4 },
-  noDateTipTitle: {
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.bold,
-    color: '#7A5200',
-  },
-  noDateTipBody: {
-    fontSize: fontSizes.sm,
-    color: '#7A6030',
-    lineHeight: 20,
-  },
-
-  // Back to advisory button
-  backToAdvisoryBtn: {
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.sm,
-  },
-  backToAdvisoryText: {
-    fontSize: fontSizes.md,
-    color: colors.textSecondary,
-    fontWeight: fontWeights.semibold,
-  },
+  // Date picker modal
+  dpOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  dpSheet: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.xl, paddingBottom: spacing.xxxl },
+  dpHandle: { width: 40, height: 4, backgroundColor: '#DDD', borderRadius: 2, alignSelf: 'center', marginBottom: spacing.lg },
+  dpTitle: { fontSize: fontSizes.xl, fontWeight: fontWeights.bold, color: colors.textPrimary, textAlign: 'center', marginBottom: 4 },
+  dpSub: { fontSize: fontSizes.sm, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg },
+  dpCols: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  dpColLabel: { fontSize: fontSizes.xs, fontWeight: fontWeights.bold, color: colors.textMuted, textAlign: 'center', marginBottom: spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
+  dpScroll: { maxHeight: 176, borderRadius: radius.md, backgroundColor: '#F8FAF9' },
+  dpItem: { height: 44, justifyContent: 'center', alignItems: 'center', borderRadius: radius.sm },
+  dpItemActive: { backgroundColor: colors.primary },
+  dpItemText: { fontSize: fontSizes.md, color: colors.textSecondary, fontWeight: fontWeights.medium },
+  dpItemTextActive: { color: '#fff', fontWeight: fontWeights.bold },
+  dpPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primarySurface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg },
+  dpPreviewLabel: { fontSize: fontSizes.sm, color: colors.textSecondary },
+  dpPreviewDate: { fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: colors.primary },
+  dpBtns: { flexDirection: 'row', gap: spacing.md },
+  dpCancel: { flex: 1, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, paddingVertical: spacing.md, alignItems: 'center' },
+  dpCancelText: { fontSize: fontSizes.md, color: colors.textSecondary, fontWeight: fontWeights.semibold },
+  dpConfirm: { flex: 2, borderRadius: radius.md, backgroundColor: colors.primary, paddingVertical: spacing.md, alignItems: 'center' },
+  dpConfirmText: { fontSize: fontSizes.md, color: '#fff', fontWeight: fontWeights.bold },
 });

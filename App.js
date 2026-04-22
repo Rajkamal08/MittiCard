@@ -29,7 +29,6 @@ import SoilInputScreen       from './src/screens/SoilInputScreen';
 import AdvisoryResultScreen  from './src/screens/AdvisoryResultScreen';
 import CropCalendarScreen    from './src/screens/CropCalendarScreen';
 import OCRScreen             from './src/screens/OCRScreen';
-import FPODashboardScreen    from './src/screens/FPODashboardScreen';
 
 // Services
 import {
@@ -169,7 +168,6 @@ export default function App() {
         <Stack.Screen name="AdvisoryResult" component={AdvisoryResultScreen} />
         <Stack.Screen name="CropCalendar"   component={CropCalendarScreen} />
         <Stack.Screen name="OCR"            component={OCRScreen} />
-        <Stack.Screen name="FPODashboard"   component={FPODashboardScreen} />
 
       </Stack.Navigator>
     </NavigationContainer>
