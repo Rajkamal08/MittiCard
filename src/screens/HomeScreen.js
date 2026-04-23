@@ -1,176 +1,250 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform,
-  ScrollView, Animated, ActivityIndicator, RefreshControl, Alert,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  StatusBar,
+  Animated,
+  ActivityIndicator,
+  RefreshControl,
+  Modal,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
 import { getAdvisory } from '../services/api';
-import { getLastScanId } from '../services/storage';
+import { getUser, getLastScanId, clearStorage } from '../services/storage';
+import { setAuthToken } from '../services/api';
 import { useTranslation } from 'react-i18next';
-import axios from 'axios';
 
-const STATUS_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44;
-
-// ── Weather helpers ────────────────────────────────────────────────────────────
-const wmoLabel = (code, temp) => {
-  if (code === 0)            return { emoji: '\u{2600}\uFE0F',  desc: 'Clear Sky' };
-  if (code <= 3)             return { emoji: '\u26C5',          desc: 'Partly Cloudy' };
-  if (code <= 48)            return { emoji: '\u{1F32B}\uFE0F', desc: 'Foggy' };
-  if (code <= 67)            return { emoji: '\u{1F327}\uFE0F', desc: 'Rainy' };
-  if (code <= 77)            return { emoji: '\u{1F328}\uFE0F', desc: 'Snowy' };
-  if (code <= 99)            return { emoji: '\u26C8\uFE0F',    desc: 'Thunderstorm' };
-  if (temp > 35)             return { emoji: '\u{1F321}\uFE0F', desc: 'Very Hot' };
-  return                            { emoji: '\u{1F324}\uFE0F', desc: 'Cloudy' };
+// ─── Score helpers ────────────────────────────────────────────────────────────
+const getScoreColor = score => {
+  if (score >= 71) return colors.statusGood;
+  if (score >= 41) return colors.statusFair;
+  return colors.statusPoor;
 };
 
-const getFarmingAdvice = (code, temp, wind) => {
-  const rainy   = code >= 51 && code <= 99;
-  const thunder = code >= 80;
-  const hot     = temp > 35;
-  const windy   = wind > 25;
-  return [
-    {
-      icon: '\u{1F4A7}',
-      text: rainy ? 'Rain expected — skip irrigation today' : hot ? 'Hot day — irrigate in evening' : 'Good soil moisture conditions',
-      ok: rainy ? null : !hot,
-    },
-    {
-      icon: '\u{1F33F}',
-      text: (rainy || windy) ? 'Avoid spraying — rain/wind will wash off' : 'Good conditions for pesticide spray',
-      ok: !(rainy || windy),
-    },
-    {
-      icon: '\u{1F33E}',
-      text: thunder ? 'Thunderstorm — stay indoors, halt harvest' : hot ? 'Harvest early morning to avoid heat stress' : 'Good conditions for harvesting',
-      ok: !thunder,
-    },
-  ];
+const getScoreLabel = (score, t) => {
+  if (score >= 71) return t('advisory.score_good');
+  if (score >= 41) return t('advisory.score_fair');
+  if (score >= 1) return t('advisory.score_poor');
+  return '—';
 };
 
-// ── Score helpers ──────────────────────────────────────────────────────────────
-const scoreColor = s => s >= 70 ? colors.statusGood : s >= 40 ? colors.statusWarning : colors.statusPoor;
-const scoreLabel = s => s >= 70 ? 'Good' : s >= 40 ? 'Fair' : 'Poor';
+const getScoreEmoji = score => {
+  if (score >= 71) return '🟢';
+  if (score >= 41) return '🟡';
+  if (score >= 1) return '🔴';
+  return '🌱';
+};
 
-// ── Score Ring (pure CSS circles) ─────────────────────────────────────────────
-function ScoreRing({ score = 0, size = 110 }) {
-  const anim   = useRef(new Animated.Value(0)).current;
-  const radius2 = (size - 16) / 2;
-  const circ   = 2 * Math.PI * radius2;
-  const color  = scoreColor(score);
+const formatDate = dateStr => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+// ─── Animated Score Ring ──────────────────────────────────────────────────────
+function ScoreRing({ score, color }) {
+  const scaleAnim = useRef(new Animated.Value(0.5)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(anim, { toValue: score, duration: 900, useNativeDriver: false }).start();
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+    ]).start();
   }, [score]);
 
-  const dashOffset = anim.interpolate({
-    inputRange: [0, 100],
-    outputRange: [circ, 0],
-  });
+  return (
+    <Animated.View style={[styles.scoreRingOuter, { borderColor: color, opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+      <View style={[styles.scoreRingInner, { backgroundColor: color + '18' }]}>
+        <Text style={[styles.scoreNumber, { color }]}>
+          {score > 0 ? score : '—'}
+        </Text>
+        {score > 0 && <Text style={[styles.scoreOutOf, { color }]}>/100</Text>}
+      </View>
+    </Animated.View>
+  );
+}
+
+// ─── Nutrient Status Badge ─────────────────────────────────────────────────────
+function NutrientBadge({ label, value, unit, threshold }) {
+  const isLow = value !== null && value < threshold;
+  const bg = isLow ? '#FFF0F0' : '#F0FAF4';
+  const fg = isLow ? colors.statusPoor : colors.statusGood;
+  const tag = isLow ? 'LOW' : 'OK';
 
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{
-        width: size, height: size, borderRadius: size / 2,
-        borderWidth: 10, borderColor: colors.divider,
-        position: 'absolute',
-      }} />
-      <View style={{
-        width: size - 20, height: size - 20, borderRadius: (size - 20) / 2,
-        borderWidth: 10, borderColor: color,
-        position: 'absolute',
-        borderTopColor: 'transparent', borderRightColor: 'transparent',
-        transform: [{ rotate: `${(score / 100) * 360 - 90}deg` }],
-      }} />
-      <Text style={{ fontSize: size * 0.3, fontWeight: fontWeights.extrabold, color }}>
-        {score}
-      </Text>
+    <View style={[styles.nutrientBadge, { backgroundColor: bg }]}>
+      <Text style={[styles.nutrientLabel, { color: fg }]}>{label}</Text>
+      {value !== null && (
+        <Text style={[styles.nutrientValue, { color: fg }]}>{value}{unit}</Text>
+      )}
+      <View style={[styles.nutrientTagBox, { backgroundColor: fg + '22' }]}>
+        <Text style={[styles.nutrientTag, { color: fg }]}>{tag}</Text>
+      </View>
     </View>
   );
 }
 
-// ── Action card data ───────────────────────────────────────────────────────────
-const getActions = (t) => [
-  { id: 'scan',     icon: '\u{1F4F7}', label: 'Scan Card',      sub: 'OCR soil card',       screen: 'OCR',       bg: '#E3F2FD' },
-  { id: 'manual',   icon: '\u270F\uFE0F', label: 'Manual Entry',   sub: 'Type soil values',    screen: 'SoilInput', bg: colors.primarySurface },
-  { id: 'advisory', icon: '\u{1F4CA}', label: 'Last Advisory',   sub: 'View full report',    screen: 'AdvisoryResult', bg: '#FFF8E1' },
-  { id: 'calendar', icon: '\u{1F4C5}', label: 'Crop Calendar',   sub: 'Season timeline',     screen: 'CropCalendar', bg: '#F3E5F5' },
-];
-
-// ── Main component ─────────────────────────────────────────────────────────────
-export default function HomeScreen({ navigation }) {
-  const { t, i18n } = useTranslation();
-  const [advisory,   setAdvisory]   = useState(null);
-  const [loading,    setLoading]    = useState(true);
+// ─── Main HomeScreen ──────────────────────────────────────────────────────────
+export default function HomeScreen({ navigation, route }) {
+  const { t } = useTranslation();
+  const [user, setUser] = useState(route?.params?.user || null);
+  const [lastScan, setLastScan] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [weather,    setWeather]    = useState(null);
-  const [weatherLoad,setWeatherLoad]= useState(true);
-  const [offline,    setOffline]    = useState(false);
-  const [scanId,     setScanId]     = useState(null);
+  const [error, setError] = useState(null);
 
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(24)).current;
-  const ACTIONS   = getActions(t);
+  // ── Weather state ──────────────────────────────────────────────────────────
+  const [weather, setWeather] = useState(null);
+  const [weatherLoad, setWeatherLoad] = useState(false);
 
-  // Load advisory
+  // ── Notification panel state ───────────────────────────────────────────────
+  const [showNotif, setShowNotif] = useState(false);
+  const [notifBadge, setNotifBadge] = useState(0);
+
+  const headerFade = useRef(new Animated.Value(0)).current;
+  const cardSlide = useRef(new Animated.Value(40)).current;
+  const cardFade = useRef(new Animated.Value(0)).current;
+
+  // ─── Run entrance animation ─────────────────────────────────────────────────
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(headerFade, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(cardFade, { toValue: 1, duration: 700, delay: 200, useNativeDriver: true }),
+      Animated.timing(cardSlide, { toValue: 0, duration: 600, delay: 200, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  // ─── Load user + last scan on mount ────────────────────────────────────────
   const loadData = useCallback(async (isRefresh = false) => {
-    if (!isRefresh) setLoading(true);
+    if (isRefresh) setRefreshing(true);
     try {
-      const id = await getLastScanId();
-      setScanId(id);
-      if (id) {
-        const res = await getAdvisory(id);
-        if (res.data?.success) setAdvisory(res.data.data);
+      // Get user from storage if not in route params
+      if (!user) {
+        const storedUser = await getUser();
+        if (storedUser) setUser(storedUser);
       }
-      setOffline(false);
-    } catch {
-      setOffline(true);
+
+      // Get last scan ID → fetch advisory
+      const scanId = await getLastScanId();
+      if (scanId) {
+        const response = await getAdvisory(scanId);
+        if (response.data.success) {
+          setLastScan(response.data.data);
+        }
+      }
+      setError(null);
+    } catch (err) {
+      // Don't show error if it's just "no scan yet"
+      if (err?.status !== 404) {
+        setError('Could not load latest scan');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user]);
 
-  // Load weather
-  const loadWeather = useCallback(async () => {
-    setWeatherLoad(true);
-    try {
-      const loc = await axios.get('http://ip-api.com/json/?fields=lat,lon,city', { timeout: 5000 });
-      const { lat, lon } = loc.data;
-      const wx  = await axios.get(
-        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`, { timeout: 5000 }
-      );
-      const cw = wx.data.current_weather;
-      setWeather({ temperature: cw.temperature, windspeed: cw.windspeed, weathercode: cw.weathercode, city: loc.data.city });
-    } catch { /* silent — weather is optional */ }
-    finally { setWeatherLoad(false); }
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
-  useFocusEffect(useCallback(() => {
-    loadData();
-    Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 450, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 450, useNativeDriver: true }),
-    ]).start();
-  }, []));
+  // ─── Refresh when navigating back to Home after a new scan ─────────────────
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => { loadData(false); });
+    return unsubscribe;
+  }, [navigation, loadData]);
 
-  useEffect(() => { loadWeather(); }, []);
-
-  const onRefresh = () => { setRefreshing(true); loadData(true); };
-
-  const score = advisory?.soil_health_score ?? 0;
-  const crop  = advisory?.crop ?? '';
-  const wInfo = weather ? wmoLabel(weather.weathercode, weather.temperature) : null;
-
-  const handleAction = (action) => {
-    if ((action.id === 'advisory' || action.id === 'calendar') && !scanId) {
-      Alert.alert('No Data Yet', 'Please scan or enter soil values first.');
-      return;
-    }
-    if (action.id === 'advisory') navigation.navigate('AdvisoryResult', { advisory, scan_id: scanId });
-    else if (action.id === 'calendar') navigation.navigate('CropCalendar', { scan_id: scanId, advisory });
-    else navigation.navigate(action.screen);
+  // ─── Logout handler ─────────────────────────────────────────────────────────
+  const handleLogout = async () => {
+    await clearStorage();
+    setAuthToken(null);
+    navigation.replace('Login');
   };
+
+  // ─── Fetch weather using IP-based location (no GPS permission needed) ────────
+  useEffect(() => {
+    const fetchWeather = async () => {
+      setWeatherLoad(true);
+      try {
+        // Step 1: Get lat/lon from IP address (free, no key, no permission)
+        const locRes = await fetch('https://ip-api.com/json/');
+        const locData = await locRes.json();
+        if (!locData.lat) throw new Error('Location unavailable');
+
+        // Step 2: Fetch weather from Open-Meteo (free, no key)
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${locData.lat.toFixed(2)}&longitude=${locData.lon.toFixed(2)}&current_weather=true&timezone=Asia%2FKolkata`;
+        const wRes = await fetch(url);
+        const wData = await wRes.json();
+        if (wData.current_weather) setWeather(wData.current_weather);
+      } catch { /* fail silently — weather is optional */ }
+      setWeatherLoad(false);
+    };
+    fetchWeather();
+  }, []);
+
+  // ─── Build notifications from scan data ─────────────────────────────────────
+  useEffect(() => {
+    if (!lastScan) { setNotifBadge(0); return; }
+    const alerts = [];
+    const ns = lastScan;
+    if (ns.nitrogen !== null && ns.nitrogen < 140) alerts.push(1);
+    if (ns.phosphorus !== null && ns.phosphorus < 11) alerts.push(1);
+    if (ns.potassium !== null && ns.potassium < 108) alerts.push(1);
+    if (ns.organic_carbon !== null && ns.organic_carbon < 0.5) alerts.push(1);
+    if (ns.zinc !== null && ns.zinc < 0.6) alerts.push(1);
+    if (ns.ph !== null && (ns.ph < 5.5 || ns.ph > 8.0)) alerts.push(1);
+    setNotifBadge(alerts.length);
+  }, [lastScan]);
+
+  // ─── WMO weather code → emoji + description ──────────────────────────────
+  const wmoWeather = (code, temp) => {
+    if (code === 0) return { emoji: '☀️', desc: 'Clear sky' };
+    if (code <= 2) return { emoji: '⛅', desc: 'Partly cloudy' };
+    if (code === 3) return { emoji: '☁️', desc: 'Overcast' };
+    if (code <= 48) return { emoji: '🌫️', desc: 'Foggy' };
+    if (code <= 67) return { emoji: '🌧️', desc: 'Rainy' };
+    if (code <= 77) return { emoji: '❄️', desc: 'Snowy' };
+    if (code <= 82) return { emoji: '🌦️', desc: 'Rain showers' };
+    if (code <= 99) return { emoji: '⛈️', desc: 'Thunderstorm' };
+    return { emoji: temp > 35 ? '🌡️' : '🌤️', desc: 'Variable' };
+  };
+
+  // ─── Notification items built from scan ──────────────────────────────────
+  const buildNotifications = () => {
+    const list = [];
+    if (!lastScan) {
+      list.push({ id: 1, icon: '📋', title: 'No scan yet', body: 'Scan your soil card to get personalized alerts.' });
+      return list;
+    }
+    const ns = lastScan;
+    if (ns.nitrogen !== null && ns.nitrogen < 140)
+      list.push({ id: 2, icon: '🔴', title: 'Nitrogen is LOW', body: `Your N is ${ns.nitrogen} kg/ha. Ideal: ≥140. Apply Urea or DAP this season.` });
+    if (ns.phosphorus !== null && ns.phosphorus < 11)
+      list.push({ id: 3, icon: '🔴', title: 'Phosphorus is LOW', body: `Your P is ${ns.phosphorus} kg/ha. Apply SSP or DAP.` });
+    if (ns.potassium !== null && ns.potassium < 108)
+      list.push({ id: 4, icon: '🟠', title: 'Potassium is LOW', body: `Your K is ${ns.potassium} kg/ha. Apply MOP (Muriate of Potash).` });
+    if (ns.organic_carbon !== null && ns.organic_carbon < 0.5)
+      list.push({ id: 5, icon: '🟠', title: 'Organic Carbon LOW', body: 'Add compost or green manure to improve OC levels.' });
+    if (ns.zinc !== null && ns.zinc < 0.6)
+      list.push({ id: 6, icon: '🟡', title: 'Zinc Deficient', body: 'Apply Zinc Sulphate @ 25 kg/ha to correct deficiency.' });
+    if (ns.ph !== null && (ns.ph < 5.5 || ns.ph > 8.0))
+      list.push({ id: 7, icon: '⚠️', title: `pH is ${ns.ph < 5.5 ? 'too Acidic' : 'too Alkaline'}`, body: ns.ph < 5.5 ? 'Apply Agricultural Lime to neutralize acidity.' : 'Apply Gypsum to correct alkalinity.' });
+    if (list.length === 0)
+      list.push({ id: 8, icon: '✅', title: 'All nutrients healthy!', body: 'Your soil is in great condition. Keep scanning every season.' });
+    list.push({ id: 9, icon: '💡', title: 'Tip: Best time to apply', body: 'Apply fertilizers early morning or after rain for best absorption.' });
+    return list;
+  };
+
+  // ─── Greeting based on time ─────────────────────────────────────────────────
+  const hour = new Date().getHours();
+  const greetEmoji = hour < 12 ? '☀️' : hour < 17 ? '🌤️' : '🌙';
+  const firstName = user?.name?.split(' ')[0] || t('home.greeting_default').replace('नमस्ते, ', '').replace('Hello, ', '');
+  const greeting = t('home.greeting', { name: firstName });
+
+  const score = lastScan?.soil_health_score || 0;
+  const scoreColor = getScoreColor(score);
 
   return (
     <View style={styles.container}>
@@ -178,328 +252,858 @@ export default function HomeScreen({ navigation }) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadData(true)}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* ── HEADER ─────────────────────────────────────────────────────── */}
         <View style={styles.header}>
-          <View style={styles.headerBlob} />
-          <View style={styles.headerTop}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.greeting}>{'\u{1F44B}'} {t('home.greeting') || 'Namaste!'}</Text>
-              <Text style={styles.greetingSub}>{t('home.question') || 'What would you like to do today?'}</Text>
-            </View>
-            {/* Notification bell */}
-            <TouchableOpacity style={styles.bellBtn}>
-              <Text style={{ fontSize: 22 }}>{'\u{1F514}'}</Text>
-            </TouchableOpacity>
-          </View>
+          <View style={styles.headerBubble} />
 
-          {/* Weather pill in header */}
-          {weather && (
-            <View style={styles.weatherPill}>
-              <Text style={styles.weatherPillText}>
-                {wInfo?.emoji} {Math.round(weather.temperature)}°C  {weather.city || ''}
-              </Text>
+          <Animated.View style={[styles.headerTop, { opacity: headerFade }]}>
+            {/* Greeting row */}
+            <View style={styles.greetingRow}>
+              <View>
+                <Text style={styles.greetingText}>{greetEmoji} {greeting}</Text>
+                <Text style={styles.farmerName}>{firstName}</Text>
+                {user?.phone && (
+                  <Text style={styles.farmerPhone}>+91 {user.phone}</Text>
+                )}
+              </View>
+              {/* Notification bell + logout */}
+              <View style={styles.headerActions}>
+                {/* Bell with badge */}
+                <TouchableOpacity style={styles.iconBtnRelative} onPress={() => setShowNotif(true)}>
+                  <Text style={styles.iconBtnText}>🔔</Text>
+                  {notifBadge > 0 && (
+                    <View style={styles.notifBadge}>
+                      <Text style={styles.notifBadgeText}>{notifBadge}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconBtn} onPress={handleLogout}>
+                  <Text style={styles.iconBtnText}>↩️</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          )}
-          {weatherLoad && !weather && (
-            <View style={styles.weatherPill}>
-              <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
-              <Text style={[styles.weatherPillText, { marginLeft: 6 }]}>Getting weather…</Text>
-            </View>
-          )}
-        </View>
 
-        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+            {/* ── WEATHER WIDGET ─────────────────────────────────────────── */}
+            {(weather || weatherLoad) && (
+              <View style={styles.weatherWidget}>
+                {weatherLoad ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : weather ? (
+                  <>
+                    <View style={styles.weatherLeft}>
+                      <Text style={styles.weatherEmoji}>{wmoWeather(weather.weathercode, weather.temperature).emoji}</Text>
+                      <View>
+                        <Text style={styles.weatherTemp}>{Math.round(weather.temperature)}°C</Text>
+                        <Text style={styles.weatherDesc}>{wmoWeather(weather.weathercode, weather.temperature).desc}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.weatherRight}>
+                      <Text style={styles.weatherWind}>💨 {weather.windspeed} km/h</Text>
+                      <Text style={styles.weatherTip}>
+                        {weather.temperature > 35 ? '🌡️ Hot — irrigate crops' : weather.temperature < 15 ? '🥶 Cold — protect seedlings' : '✅ Good conditions'}
+                      </Text>
+                    </View>
+                  </>
+                ) : null}
+              </View>
+            )}
 
-          {/* ── SCORE CARD (floats over header) ─────────────────────────── */}
-          <View style={[styles.scoreCard, shadows.xl]}>
-            <View style={styles.scoreLeft}>
-              <ScoreRing score={score} size={110} />
-              <Text style={[styles.scoreLabel, { color: scoreColor(score) }]}>
-                {scoreLabel(score)}
-              </Text>
-              <Text style={styles.scoreSub}>{t('advisory.score_label') || 'Soil Health Score'}</Text>
-            </View>
-            <View style={styles.scoreRight}>
+            {/* ── SCORE CARD ───────────────────────────────────────────────── */}
+            <View style={[styles.scoreCard, shadows.lg]}>
+              <Text style={styles.scoreCardTitle}>🌿 {t('advisory.score_label')}</Text>
+
               {loading ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : advisory ? (
-                <>
-                  <View style={[styles.scoreBadge, { backgroundColor: scoreColor(score) + '18' }]}>
-                    <Text style={[styles.scoreBadgeText, { color: scoreColor(score) }]}>
-                      {crop.toUpperCase()}
-                    </Text>
-                  </View>
-                  <Text style={styles.scoreDetail}>
-                    N: {advisory.nutrient_status?.nitrogen?.value ?? '--'} kg/ha
-                  </Text>
-                  <Text style={styles.scoreDetail}>
-                    P: {advisory.nutrient_status?.phosphorus?.value ?? '--'} kg/ha
-                  </Text>
-                  <Text style={styles.scoreDetail}>
-                    K: {advisory.nutrient_status?.potassium?.value ?? '--'} kg/ha
-                  </Text>
-                  <Text style={styles.scoreDate}>
-                    {advisory.generated_at
-                      ? new Date(advisory.generated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-                      : 'Recent scan'}
-                  </Text>
-                </>
+                <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.xl }} />
               ) : (
-                <View style={styles.noDataBox}>
-                  <Text style={styles.noDataEmoji}>{'\u{1F331}'}</Text>
-                  <Text style={styles.noDataText}>No scan yet</Text>
-                  <Text style={styles.noDataSub}>Tap Scan to begin</Text>
+                <View style={styles.scoreCardBody}>
+                  {/* Big animated score ring */}
+                  <ScoreRing score={score} color={scoreColor} />
+
+                  {/* Right side info */}
+                  <View style={styles.scoreCardRight}>
+                    {lastScan ? (
+                      <>
+                        <View style={[styles.scoreLabelBadge, { backgroundColor: scoreColor + '20' }]}>
+                          <Text style={[styles.scoreLabelText, { color: scoreColor }]}>
+                            {getScoreEmoji(score)} {getScoreLabel(score, t)}
+                          </Text>
+                        </View>
+
+                        <Text style={styles.scanInfoText}>
+                          🌾 Crop:{' '}
+                          <Text style={styles.scanInfoBold}>
+                            {lastScan.crop?.charAt(0).toUpperCase() + lastScan.crop?.slice(1)}
+                          </Text>
+                        </Text>
+                        <Text style={styles.scanInfoText}>
+                          📅 Scanned:{' '}
+                          <Text style={styles.scanInfoBold}>
+                            {formatDate(lastScan.scanned_at)}
+                          </Text>
+                        </Text>
+                        <Text style={styles.scanInfoText}>
+                          💰 Est. cost:{' '}
+                          <Text style={styles.scanInfoBold}>
+                            ₹{lastScan.total_cost?.toLocaleString('en-IN') || '—'}
+                          </Text>
+                        </Text>
+                      </>
+                    ) : (
+                      <View style={styles.noScanInfo}>
+                        <Text style={styles.noScanText}>{t('home.no_advisory').split('.')[0]}</Text>
+                        <Text style={styles.noScanSub}>{t('home.no_advisory').split('. ').slice(1).join('. ')}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* pH bar (only if scan exists) */}
+              {lastScan?.ph && (
+                <View style={styles.phRow}>
+                  <Text style={styles.phLabel}>pH Level</Text>
+                  <View style={styles.phBarBg}>
+                    <View
+                      style={[
+                        styles.phBarFill,
+                        {
+                          width: `${Math.min((lastScan.ph / 14) * 100, 100)}%`,
+                          backgroundColor:
+                            lastScan.ph >= 6 && lastScan.ph <= 7.5
+                              ? colors.statusGood
+                              : lastScan.ph >= 5.5
+                                ? colors.statusFair
+                                : colors.statusPoor,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.phValue}>{lastScan.ph}</Text>
                 </View>
               )}
             </View>
-          </View>
+          </Animated.View>
+        </View>
 
-          {/* ── ACTION GRID ──────────────────────────────────────────────── */}
-          <Text style={styles.sectionLabel}>QUICK ACTIONS</Text>
-          <View style={styles.actionGrid}>
-            {ACTIONS.map(action => (
-              <TouchableOpacity
-                key={action.id}
-                style={[styles.actionCard, shadows.sm]}
-                onPress={() => handleAction(action)}
-                activeOpacity={0.82}
-              >
-                <View style={[styles.actionIconCircle, { backgroundColor: action.bg }]}>
-                  <Text style={styles.actionIcon}>{action.icon}</Text>
-                </View>
-                <Text style={styles.actionLabel}>{action.label}</Text>
-                <Text style={styles.actionSub}>{action.sub}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* ── WEATHER ADVICE CARD ──────────────────────────────────────── */}
-          {offline && (
-            <View style={styles.offlineBanner}>
-              <Text style={styles.offlineBannerText}>{'\u{1F4F4}'} Offline — showing cached data</Text>
+        {/* ── BODY CONTENT ───────────────────────────────────────────────── */}
+        <Animated.View
+          style={[
+            styles.body,
+            { opacity: cardFade, transform: [{ translateY: cardSlide }] },
+          ]}
+        >
+          {/* ── NUTRIENT QUICK BADGES (if scan exists) ─────────────────── */}
+          {lastScan && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('advisory.section_status')}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.badgeScroll}>
+                <NutrientBadge label="N" value={lastScan.nitrogen} unit=" kg/ha" threshold={140} />
+                <NutrientBadge label="P" value={lastScan.phosphorus} unit=" kg/ha" threshold={11} />
+                <NutrientBadge label="K" value={lastScan.potassium} unit=" kg/ha" threshold={108} />
+                <NutrientBadge label="OC" value={lastScan.organic_carbon} unit="%" threshold={0.5} />
+                {lastScan.zinc && <NutrientBadge label="Zn" value={lastScan.zinc} unit="" threshold={0.6} />}
+                {lastScan.sulfur && <NutrientBadge label="S" value={lastScan.sulfur} unit="" threshold={10} />}
+              </ScrollView>
             </View>
           )}
 
-          {weather && (
-            <>
-              <Text style={styles.sectionLabel}>TODAY'S FARMING ADVICE</Text>
-              <View style={[styles.weatherCard, shadows.sm]}>
-                <View style={styles.weatherTopRow}>
-                  <View style={styles.weatherMain}>
-                    <Text style={styles.weatherEmoji}>{wInfo?.emoji}</Text>
-                    <View>
-                      <Text style={styles.weatherTemp}>{Math.round(weather.temperature)}°C</Text>
-                      <Text style={styles.weatherDesc}>{wInfo?.desc}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.weatherWind}>{'\u{1F4A8}'} {Math.round(weather.windspeed)} km/h</Text>
-                </View>
-                <View style={styles.divider} />
-                {getFarmingAdvice(weather.weathercode, weather.temperature, weather.windspeed).map((adv, i) => (
-                  <View key={i} style={[
-                    styles.adviceRow,
-                    adv.ok === true  && styles.adviceRowGood,
-                    adv.ok === false && styles.adviceRowBad,
-                    adv.ok === null  && styles.adviceRowNeutral,
-                  ]}>
-                    <Text style={styles.adviceIcon}>{adv.icon}</Text>
-                    <Text style={[styles.adviceText,
-                      adv.ok === true  && { color: colors.statusGood },
-                      adv.ok === false && { color: colors.statusPoor },
-                    ]}>{adv.text}</Text>
-                    <View style={[styles.adviceBadge,
-                      adv.ok === true  && { backgroundColor: colors.badgeGood },
-                      adv.ok === false && { backgroundColor: colors.badgeLow },
-                      adv.ok === null  && { backgroundColor: colors.badgeMedium },
-                    ]}>
-                      <Text style={[styles.adviceBadgeText,
-                        adv.ok === true  && { color: colors.badgeGoodText },
-                        adv.ok === false && { color: colors.badgeLowText },
-                        adv.ok === null  && { color: colors.badgeMediumText },
-                      ]}>
-                        {adv.ok === true ? 'OK' : adv.ok === false ? 'AVOID' : 'CHECK'}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </>
-          )}
+          {/* ── PRIMARY ACTIONS — TWO EQUAL BUTTONS ────────────────────── */}
+          <View style={styles.primaryActionsRow}>
+            {/* Manual entry */}
+            <TouchableOpacity
+              style={[styles.scanBtn, { flex: 1 }]}
+              onPress={() => navigation.navigate('SoilInput')}
+              activeOpacity={0.88}
+            >
+              <Text style={styles.scanBtnEmoji}>🔬</Text>
+              <Text style={styles.scanBtnTitle}>
+                {lastScan ? t('home.scan_card') : t('home.enter_manual')}
+              </Text>
+              <Text style={styles.scanBtnSub}>{t('home.enter_manual_sub')}</Text>
+            </TouchableOpacity>
 
-          {/* ── RECENT NUTRIENTS (if advisory exists) ───────────────────── */}
-          {advisory?.recommendations?.length > 0 && (
-            <>
-              <Text style={styles.sectionLabel}>FERTILIZER SUMMARY</Text>
-              <View style={[styles.fertCard, shadows.sm]}>
-                {advisory.recommendations.slice(0, 3).map((rec, i) => (
-                  <View key={i} style={[styles.fertRow, i > 0 && styles.fertRowBorder]}>
-                    <Text style={styles.fertName}>{rec.fertilizer}</Text>
-                    <Text style={styles.fertQty}>{rec.bags_needed} bags</Text>
-                    <Text style={styles.fertCost}>{rec.total_cost_inr}</Text>
-                  </View>
-                ))}
-                <TouchableOpacity
-                  style={styles.viewFullBtn}
-                  onPress={() => navigation.navigate('AdvisoryResult', { advisory, scan_id: scanId })}
-                >
-                  <Text style={styles.viewFullText}>View Full Advisory {'\u2192'}</Text>
-                </TouchableOpacity>
+            {/* OCR camera */}
+            <TouchableOpacity
+              style={[styles.scanBtn, styles.ocrBtn, { flex: 1 }]}
+              onPress={() => navigation.navigate('OCR')}
+              activeOpacity={0.88}
+            >
+              <Text style={styles.scanBtnEmoji}>📷</Text>
+              <Text style={styles.scanBtnTitle}>{t('home.scan_card')}</Text>
+              <Text style={styles.scanBtnSub}>{t('home.scan_card_sub')}</Text>
+              <View style={styles.newPill}>
+                <Text style={styles.newPillText}>NEW</Text>
               </View>
-            </>
-          )}
+            </TouchableOpacity>
+          </View>
 
+          {/* ── SECONDARY ACTIONS GRID ───────────────────────────────────── */}
+          <View style={styles.actionsRow}>
+            {/* View Last Report */}
+            <TouchableOpacity
+              style={[styles.actionCard, !lastScan && styles.actionCardDisabled]}
+              onPress={() =>
+                lastScan
+                  ? navigation.navigate('AdvisoryResult', {
+                    advisory: lastScan,
+                    scan_id: lastScan.id,
+                    crop: lastScan.crop,
+                    farmSize: lastScan.farm_size_acres,
+                  })
+                  : null
+              }
+              activeOpacity={lastScan ? 0.85 : 1}
+            >
+              <Text style={styles.actionEmoji}>📋</Text>
+              <Text style={styles.actionTitle}>{t('home.last_advisory')}</Text>
+              <Text style={styles.actionSub}>
+                {lastScan ? `${t('advisory.score_label')}: ${score}/100` : t('home.no_advisory').split('.')[0]}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Crop Calendar */}
+            <TouchableOpacity
+              style={[styles.actionCard, !lastScan && styles.actionCardDisabled]}
+              onPress={() =>
+                lastScan
+                  ? navigation.navigate('CropCalendar', { scan_id: lastScan.id })
+                  : null
+              }
+              activeOpacity={lastScan ? 0.85 : 1}
+            >
+              <Text style={styles.actionEmoji}>📅</Text>
+              <Text style={styles.actionTitle}>{t('home.crop_calendar')}</Text>
+              <Text style={styles.actionSub}>
+                {lastScan?.crop
+                  ? `${lastScan.crop.charAt(0).toUpperCase() + lastScan.crop.slice(1)} ${t('calendar.subtitle', { crop: '' }).replace(' ', '')}`
+                  : t('home.no_advisory').split('.')[0]}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+
+
+          {/* ── TIPS CARD ────────────────────────────────────────────────── */}
+          <View style={styles.tipCard}>
+            <Text style={styles.tipIcon}>💡</Text>
+            <View style={styles.tipTextBlock}>
+              <Text style={styles.tipTitle}>Did you know?</Text>
+              <Text style={styles.tipBody}>
+                Soil with pH between 6.0–7.5 gives the best crop yield. Test your soil every season for best results.
+              </Text>
+            </View>
+          </View>
+
+          {/* ── ERROR STATE ──────────────────────────────────────────────── */}
+          {error && (
+            <Text style={styles.errorText}>⚠️ {error}</Text>
+          )}
         </Animated.View>
       </ScrollView>
+
+      {/* ── NOTIFICATION MODAL ────────────────────────────────────────── */}
+      <Modal
+        visible={showNotif}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowNotif(false)}
+      >
+        <TouchableOpacity
+          style={styles.notifOverlay}
+          activeOpacity={1}
+          onPress={() => setShowNotif(false)}
+        >
+          <View style={styles.notifSheet}>
+            {/* Handle */}
+            <View style={styles.notifHandleRow}>
+              <View style={styles.notifHandle} />
+            </View>
+
+            {/* Header */}
+            <View style={styles.notifSheetHeader}>
+              <Text style={styles.notifSheetTitle}>🔔 Soil Alerts</Text>
+              {notifBadge > 0 && (
+                <View style={styles.notifCountPill}>
+                  <Text style={styles.notifCountText}>{notifBadge} alerts</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Notification list */}
+            <ScrollView style={styles.notifScroll} showsVerticalScrollIndicator={false}>
+              {buildNotifications().map(n => (
+                <View key={n.id} style={styles.notifItem}>
+                  <Text style={styles.notifItemIcon}>{n.icon}</Text>
+                  <View style={styles.notifItemBody}>
+                    <Text style={styles.notifItemTitle}>{n.title}</Text>
+                    <Text style={styles.notifItemText}>{n.body}</Text>
+                  </View>
+                </View>
+              ))}
+              <View style={styles.notifListFooter} />
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
 
-const SCREEN_WIDTH = require('react-native').Dimensions.get('window').width;
-const CARD_W = (SCREEN_WIDTH - spacing.lg * 2 - spacing.md) / 2;
-
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  scroll: { paddingBottom: spacing.xxxl },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
 
   // Header
   header: {
     backgroundColor: colors.primary,
-    paddingTop: STATUS_HEIGHT + 12,
-    paddingBottom: 60,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxl + spacing.xl,
     paddingHorizontal: spacing.lg,
-    borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
     overflow: 'hidden',
   },
-  headerBlob: {
-    position: 'absolute', top: -50, right: -40, width: 180, height: 180,
-    borderRadius: 90, backgroundColor: colors.primaryLight, opacity: 0.22,
+  headerBubble: {
+    position: 'absolute',
+    top: -60,
+    right: -50,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: colors.primaryLight,
+    opacity: 0.35,
   },
-  headerTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.md },
-  greeting: { fontSize: fontSizes.xl, fontWeight: fontWeights.extrabold, color: '#fff' },
-  greetingSub: { fontSize: fontSizes.sm, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
-  bellBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center', justifyContent: 'center',
+  headerTop: {
+    gap: spacing.lg,
   },
-  weatherPill: {
-    flexDirection: 'row', alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 6,
+  greetingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  weatherPillText: { color: '#fff', fontSize: fontSizes.sm, fontWeight: fontWeights.medium },
+  greetingText: {
+    fontSize: fontSizes.md,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: fontWeights.medium,
+  },
+  farmerName: {
+    fontSize: fontSizes.xxxl,
+    fontWeight: fontWeights.extrabold,
+    color: colors.textOnPrimary,
+    marginTop: 2,
+  },
+  farmerPhone: {
+    fontSize: fontSizes.sm,
+    color: 'rgba(255,255,255,0.55)',
+    marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  iconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnRelative: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  iconBtnText: {
+    fontSize: 18,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#E63946',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  notifBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  // Weather widget
+  weatherWidget: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 14,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  weatherLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  weatherEmoji: {
+    fontSize: 28,
+    marginRight: 10,
+  },
+  weatherTemp: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  weatherDesc: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  weatherRight: {
+    alignItems: 'flex-end',
+  },
+  weatherWind: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+  },
+  weatherTip: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 10,
+    marginTop: 3,
+  },
+  // Notification modal
+  notifOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.42)',
+  },
+  notifSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    maxHeight: '76%',
+    paddingBottom: 32,
+  },
+  notifHandleRow: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  notifHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E2EBE7',
+    borderRadius: 2,
+  },
+  notifSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F7F4',
+  },
+  notifSheetTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1B2E25',
+  },
+  notifCountPill: {
+    backgroundColor: '#E63946',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  notifCountText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  notifScroll: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  notifItem: {
+    flexDirection: 'row',
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F7F4',
+  },
+  notifItemIcon: {
+    fontSize: 22,
+    marginTop: 2,
+    marginRight: 12,
+  },
+  notifItemBody: {
+    flex: 1,
+  },
+  notifItemTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1B2E25',
+    marginBottom: 3,
+  },
+  notifItemText: {
+    fontSize: 13,
+    color: '#6B8F7A',
+    lineHeight: 19,
+  },
+  notifListFooter: {
+    height: 24,
+  },
 
-  // Score card
+  // Score Card inside header
   scoreCard: {
-    backgroundColor: colors.surface, borderRadius: radius.xl,
-    marginHorizontal: spacing.lg, marginTop: -40,
-    padding: spacing.lg, flexDirection: 'row',
-    alignItems: 'center', gap: spacing.lg,
-    borderWidth: 1, borderColor: colors.border,
-    marginBottom: spacing.xl,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
   },
-  scoreLeft: { alignItems: 'center', gap: 4 },
-  scoreLabel: { fontSize: fontSizes.md, fontWeight: fontWeights.bold },
-  scoreSub: { fontSize: fontSizes.xs, color: colors.textMuted, textAlign: 'center' },
-  scoreRight: { flex: 1, gap: 4 },
-  scoreBadge: {
-    alignSelf: 'flex-start', borderRadius: radius.full,
-    paddingHorizontal: 10, paddingVertical: 3, marginBottom: 4,
+  scoreCardTitle: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.semibold,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    letterSpacing: 0.5,
   },
-  scoreBadgeText: { fontSize: fontSizes.xs, fontWeight: fontWeights.bold },
-  scoreDetail: { fontSize: fontSizes.sm, color: colors.textSecondary },
-  scoreDate: { fontSize: fontSizes.xs, color: colors.textMuted, marginTop: 6 },
-  noDataBox: { alignItems: 'center', gap: 4 },
-  noDataEmoji: { fontSize: 28 },
-  noDataText: { fontSize: fontSizes.md, fontWeight: fontWeights.semibold, color: colors.textPrimary },
-  noDataSub: { fontSize: fontSizes.sm, color: colors.textMuted },
-
-  // Section label
-  sectionLabel: {
-    fontSize: fontSizes.xs, fontWeight: fontWeights.bold,
-    color: colors.textMuted, letterSpacing: 1.2,
-    textTransform: 'uppercase', marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm, marginTop: spacing.sm,
+  scoreCardBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
   },
 
-  // Action grid
-  actionGrid: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    paddingHorizontal: spacing.lg, gap: spacing.md,
-    marginBottom: spacing.lg,
+  // Score Ring
+  scoreRingOuter: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  actionCard: {
-    width: CARD_W, backgroundColor: colors.surface,
-    borderRadius: radius.lg, padding: spacing.md,
-    borderWidth: 1, borderColor: colors.border,
+  scoreRingInner: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  actionIconCircle: {
-    width: 44, height: 44, borderRadius: radius.md,
-    alignItems: 'center', justifyContent: 'center',
+  scoreNumber: {
+    fontSize: 30,
+    fontWeight: fontWeights.extrabold,
+    lineHeight: 34,
+  },
+  scoreOutOf: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.semibold,
+  },
+
+  // Score right panel
+  scoreCardRight: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  scoreLabelBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    marginBottom: spacing.xs,
+  },
+  scoreLabelText: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.bold,
+  },
+  scanInfoText: {
+    fontSize: fontSizes.sm,
+    color: colors.textSecondary,
+  },
+  scanInfoBold: {
+    fontWeight: fontWeights.semibold,
+    color: colors.textPrimary,
+  },
+  noScanInfo: {
+    gap: spacing.xs,
+  },
+  noScanText: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.bold,
+    color: colors.textMuted,
+  },
+  noScanSub: {
+    fontSize: fontSizes.sm,
+    color: colors.textMuted,
+    lineHeight: 20,
+  },
+
+  // pH bar
+  phRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  phLabel: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.semibold,
+    color: colors.textSecondary,
+    width: 36,
+  },
+  phBarBg: {
+    flex: 1,
+    height: 8,
+    backgroundColor: colors.border,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  phBarFill: {
+    height: 8,
+    borderRadius: 4,
+  },
+  phValue: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.bold,
+    color: colors.textPrimary,
+    width: 28,
+    textAlign: 'right',
+  },
+
+  // Body
+  body: {
+    marginTop: -spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
+
+  // Section
+  section: {
+    paddingTop: spacing.xl + spacing.md,
+  },
+  sectionTitle: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.bold,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
     marginBottom: spacing.sm,
   },
-  actionIcon: { fontSize: 22 },
-  actionLabel: { fontSize: fontSizes.sm, fontWeight: fontWeights.semibold, color: colors.textPrimary },
-  actionSub: { fontSize: fontSizes.xs, color: colors.textMuted },
+  badgeScroll: {
+    flexDirection: 'row',
+  },
 
-  // Offline banner
-  offlineBanner: {
-    backgroundColor: colors.badgeMedium, borderRadius: radius.md,
-    padding: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md,
+  // Nutrient Badge
+  nutrientBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    marginRight: spacing.sm,
+    gap: 4,
   },
-  offlineBannerText: { fontSize: fontSizes.sm, color: colors.badgeMediumText, textAlign: 'center' },
+  nutrientIcon: {
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.extrabold,
+  },
+  nutrientLabel: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.bold,
+  },
+  nutrientValue: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.regular,
+  },
+  nutrientTagBox: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  nutrientTag: {
+    fontSize: 9,
+    fontWeight: fontWeights.extrabold,
+    letterSpacing: 0.5,
+  },
 
-  // Weather advice card
-  weatherCard: {
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    marginHorizontal: spacing.lg, marginBottom: spacing.xl,
-    padding: spacing.md, borderWidth: 1, borderColor: colors.border,
+  // Primary Actions Row (two equal buttons side by side)
+  primaryActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.md,
   },
-  weatherTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  weatherMain: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  weatherEmoji: { fontSize: 34 },
-  weatherTemp: { fontSize: fontSizes.xl, fontWeight: fontWeights.extrabold, color: colors.textPrimary },
-  weatherDesc: { fontSize: fontSizes.xs, color: colors.textSecondary },
-  weatherWind: { fontSize: fontSizes.sm, color: colors.textSecondary },
-  divider: { height: 1, backgroundColor: colors.divider, marginBottom: spacing.sm },
-  adviceRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: '#F5F5F5', borderRadius: radius.sm,
-    paddingVertical: 8, paddingHorizontal: 10, marginBottom: 6,
+  scanBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    ...shadows.md,
+    position: 'relative',
   },
-  adviceRowGood:    { backgroundColor: colors.badgeGood },
-  adviceRowBad:     { backgroundColor: colors.badgeLow },
-  adviceRowNeutral: { backgroundColor: colors.badgeMedium },
-  adviceIcon: { fontSize: 18, width: 24 },
-  adviceText: { flex: 1, fontSize: fontSizes.xs, fontWeight: fontWeights.medium, color: colors.textPrimary },
-  adviceBadge: {
-    borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2,
-    backgroundColor: '#E0E0E0',
+  ocrBtn: {
+    backgroundColor: colors.primaryDark,
   },
-  adviceBadgeText: { fontSize: 10, fontWeight: fontWeights.bold, color: '#555' },
+  scanBtnEmoji: { fontSize: 28 },
+  scanBtnTitle: {
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.bold,
+    color: colors.textOnPrimary,
+    textAlign: 'center',
+  },
+  scanBtnSub: {
+    fontSize: fontSizes.xs,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+  },
+  newPill: {
+    position: 'absolute',
+    top: 8, right: 8,
+    backgroundColor: '#FFD700',
+    borderRadius: radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  newPillText: {
+    fontSize: 9,
+    fontWeight: fontWeights.extrabold,
+    color: '#333',
+    letterSpacing: 0.5,
+  },
 
-  // Fertilizer summary
-  fertCard: {
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    marginHorizontal: spacing.lg, marginBottom: spacing.xl,
-    borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
+  // Actions Grid
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
   },
-  fertRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: spacing.lg, paddingVertical: 12,
+  actionCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.xs,
+    ...shadows.sm,
   },
-  fertRowBorder: { borderTopWidth: 1, borderTopColor: colors.divider },
-  fertName: { flex: 1, fontSize: fontSizes.sm, fontWeight: fontWeights.semibold, color: colors.textPrimary },
-  fertQty: { fontSize: fontSizes.sm, color: colors.textSecondary, marginRight: spacing.md },
-  fertCost: { fontSize: fontSizes.sm, fontWeight: fontWeights.bold, color: colors.primary },
-  viewFullBtn: {
-    borderTopWidth: 1, borderTopColor: colors.divider,
-    paddingVertical: 12, alignItems: 'center',
-    backgroundColor: colors.primarySurface,
+  actionCardDisabled: {
+    opacity: 0.5,
   },
-  viewFullText: { fontSize: fontSizes.sm, fontWeight: fontWeights.semibold, color: colors.primary },
+  actionEmoji: {
+    fontSize: 28,
+  },
+  actionTitle: {
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.bold,
+    color: colors.textPrimary,
+  },
+  actionSub: {
+    fontSize: fontSizes.xs,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+
+  // Tip Card
+  tipCard: {
+    backgroundColor: '#FFF8EC',
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.accent,
+  },
+  tipIcon: {
+    fontSize: 24,
+  },
+  tipTextBlock: {
+    flex: 1,
+    gap: 4,
+  },
+  tipTitle: {
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.bold,
+    color: '#7A5200',
+  },
+  tipBody: {
+    fontSize: fontSizes.sm,
+    color: '#7A6030',
+    lineHeight: 20,
+  },
+
+  // Error
+  errorText: {
+    textAlign: 'center',
+    fontSize: fontSizes.sm,
+    color: colors.statusPoor,
+  },
+
+  // OCR Card
+  ocrCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: colors.primary + '40',
+    ...shadows.sm,
+  },
+  ocrCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flex: 1,
+  },
+  ocrCardEmoji: { fontSize: 28 },
+  ocrCardTitle: {
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.bold,
+    color: colors.textPrimary,
+  },
+  ocrCardSub: {
+    fontSize: fontSizes.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  ocrCardBadge: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  ocrCardBadgeText: {
+    fontSize: 10,
+    fontWeight: fontWeights.extrabold,
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
 });

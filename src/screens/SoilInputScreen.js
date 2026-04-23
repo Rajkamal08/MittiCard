@@ -1,390 +1,689 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  StatusBar, Platform, ScrollView, KeyboardAvoidingView,
-  Animated, ActivityIndicator, Alert, Modal,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  StatusBar,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Animated,
+  ActivityIndicator,
+  Alert,
+  Modal,
 } from 'react-native';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
 import { submitSoilData } from '../services/api';
 import { saveLastScanId } from '../services/storage';
 import { useTranslation } from 'react-i18next';
 
-const STATUS_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44;
-
-const CROPS = [
-  { id: 'wheat',     emoji: '\u{1F33E}', label: 'Wheat' },
-  { id: 'rice',      emoji: '\u{1F35A}', label: 'Rice' },
-  { id: 'maize',     emoji: '\u{1F33D}', label: 'Maize' },
-  { id: 'cotton',    emoji: '\u{1F33F}', label: 'Cotton' },
-  { id: 'sugarcane', emoji: '\u{1F38B}', label: 'Sugarcane' },
-  { id: 'soybean',   emoji: '\u{1FAD8}', label: 'Soybean' },
-  { id: 'groundnut', emoji: '\u{1F95C}', label: 'Groundnut' },
+// ─── 7 supported crops (translated via t) ───────────────────────────────────
+const getCrops = (t) => [
+  { id: 'wheat',     label: t('crops.wheat').replace(/ ?🌾/, ''),     emoji: '🌾' },
+  { id: 'rice',      label: t('crops.rice').replace(/ ?🍚/, ''),      emoji: '🍚' },
+  { id: 'maize',     label: t('crops.maize').replace(/ ?🌽/, ''),     emoji: '🌽' },
+  { id: 'cotton',    label: t('crops.cotton').replace(/ ?🌿/, ''),    emoji: '🌿' },
+  { id: 'sugarcane', label: t('crops.sugarcane').replace(/ ?🎋/, ''), emoji: '🎋' },
+  { id: 'soybean',   label: t('crops.soybean').replace(/ ?🫘/, ''),   emoji: '🫘' },
+  { id: 'groundnut', label: t('crops.groundnut').replace(/ ?🥜/, ''), emoji: '🥜' },
 ];
 
-const REQUIRED = [
-  { key: 'ph',         label: 'pH Level',       unit: '',      placeholder: 'e.g. 6.5',  hint: '6.0 – 7.5',  emoji: '\u{1F9EA}' },
-  { key: 'nitrogen',   label: 'Nitrogen (N)',    unit: 'kg/ha', placeholder: 'e.g. 180',  hint: '< 140 = Low', emoji: '\u{1F7E1}' },
-  { key: 'phosphorus', label: 'Phosphorus (P)',  unit: 'kg/ha', placeholder: 'e.g. 15',   hint: '< 11 = Low',  emoji: '\u{1F7E0}' },
-  { key: 'potassium',  label: 'Potassium (K)',   unit: 'kg/ha', placeholder: 'e.g. 120',  hint: '< 108 = Low', emoji: '\u{1F7E3}' },
-];
-const OPTIONAL = [
-  { key: 'organic_carbon', label: 'Organic Carbon', unit: '%',   placeholder: 'e.g. 0.65', emoji: '\u{1F7E4}' },
-  { key: 'zinc',           label: 'Zinc',            unit: 'ppm', placeholder: 'e.g. 0.8',  emoji: '\u26AB' },
-  { key: 'sulfur',         label: 'Sulfur',          unit: 'ppm', placeholder: 'e.g. 12',   emoji: '\u{1F7E1}' },
-  { key: 'iron',           label: 'Iron',            unit: 'ppm', placeholder: 'e.g. 5.2',  emoji: '\u26AB' },
+// ─── Nutrient input fields (labels translated) ───────────────────────────────
+const getFields = (t) => [
+  { key: 'ph',             label: t('soil_input.ph'),             unit: '',       placeholder: 'e.g. 6.5',  hint: 'Ideal: 6.0 – 7.5', required: true,  min: 0,  max: 14,   emoji: '⚗️' },
+  { key: 'nitrogen',       label: t('soil_input.nitrogen'),       unit: 'kg/ha',  placeholder: 'e.g. 180',  hint: 'Low if < 140',     required: true,  min: 0,  max: 1000, emoji: '🟦' },
+  { key: 'phosphorus',     label: t('soil_input.phosphorus'),     unit: 'kg/ha',  placeholder: 'e.g. 15',   hint: 'Low if < 11',      required: true,  min: 0,  max: 200,  emoji: '🟧' },
+  { key: 'potassium',      label: t('soil_input.potassium'),      unit: 'kg/ha',  placeholder: 'e.g. 120',  hint: 'Low if < 108',     required: true,  min: 0,  max: 1000, emoji: '🟥' },
+  { key: 'organic_carbon', label: t('soil_input.organic_carbon'), unit: '%',      placeholder: 'e.g. 0.65', hint: 'Low if < 0.5%',    required: false, min: 0,  max: 10,   emoji: '🟫' },
+  { key: 'zinc',           label: t('soil_input.zinc'),           unit: 'ppm',    placeholder: 'e.g. 0.8',  hint: 'Low if < 0.6',     required: false, min: 0,  max: 50,   emoji: '🔵' },
+  { key: 'sulfur',         label: t('soil_input.sulfur'),         unit: 'ppm',    placeholder: 'e.g. 12',   hint: 'Low if < 10',      required: false, min: 0,  max: 100,  emoji: '🟡' },
+  { key: 'iron',           label: t('soil_input.iron'),           unit: 'ppm',    placeholder: 'e.g. 5.2',  hint: 'Low if < 4.5',     required: false, min: 0,  max: 100,  emoji: '⚫' },
 ];
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// ─── Crop Picker Modal ────────────────────────────────────────────────────────
+function CropPickerModal({ visible, selected, onSelect, onClose }) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity style={styles.modalOverlay} onPress={onClose} activeOpacity={1}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Select Crop</Text>
+          {CROPS.map(crop => (
+            <TouchableOpacity
+              key={crop.id}
+              style={[
+                styles.cropOption,
+                selected === crop.id && styles.cropOptionSelected,
+              ]}
+              onPress={() => { onSelect(crop.id); onClose(); }}
+            >
+              <Text style={styles.cropEmoji}>{crop.emoji}</Text>
+              <Text
+                style={[
+                  styles.cropLabel,
+                  selected === crop.id && styles.cropLabelSelected,
+                ]}
+              >
+                {crop.label}
+              </Text>
+              {selected === crop.id && (
+                <Text style={styles.cropCheck}>✓</Text>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
 
-function NutField({ f, value, onChange, error }) {
+// ─── Single nutrient input row ────────────────────────────────────────────────
+function NutrientInput({ field, value, onChange, error }) {
   const [focused, setFocused] = useState(false);
   return (
-    <View style={st.fieldWrap}>
-      <View style={st.fieldTop}>
-        <Text style={st.fEmoji}>{f.emoji}</Text>
-        <Text style={st.fLabel}>{f.label}</Text>
-        {f.hint ? <Text style={st.fHint}>{f.hint}</Text> : null}
+    <View style={styles.fieldWrapper}>
+      <View style={styles.fieldHeader}>
+        <Text style={styles.fieldEmoji}>{field.emoji}</Text>
+        <Text style={styles.fieldLabel}>
+          {field.label}
+          {field.required && <Text style={styles.required}> *</Text>}
+        </Text>
+        <Text style={styles.fieldHint}>{field.hint}</Text>
       </View>
-      <View style={[st.inputRow, focused && st.inputFocused, error && st.inputError]}>
+      <View
+        style={[
+          styles.inputRow,
+          focused && styles.inputRowFocused,
+          error  && styles.inputRowError,
+        ]}
+      >
         <TextInput
-          style={st.input}
-          placeholder={f.placeholder}
+          style={styles.fieldInput}
+          placeholder={field.placeholder}
           placeholderTextColor={colors.placeholder}
           keyboardType="decimal-pad"
           value={value}
           onChangeText={onChange}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          returnKeyType="next"
         />
-        {f.unit ? <Text style={st.unit}>{f.unit}</Text> : null}
+        {field.unit ? (
+          <Text style={styles.unitLabel}>{field.unit}</Text>
+        ) : null}
       </View>
-      {error ? <Text style={st.errorText}>{error}</Text> : null}
+      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
     </View>
   );
 }
 
-export default function SoilInputScreen({ navigation, route }) {
+// ─── Main SoilInputScreen ─────────────────────────────────────────────────────
+export default function SoilInputScreen({ navigation }) {
   const { t, i18n } = useTranslation();
-  const prefill = route?.params?.prefill || {};
+  const CROPS        = getCrops(t);
+  const NUTRIENT_FIELDS = getFields(t);
 
-  const [crop,     setCrop]     = useState('');
-  const [farmSize, setFarmSize] = useState('');
-  const [sowDate,  setSowDate]  = useState('');
-  const [vals,     setVals]     = useState({
-    ph: prefill.ph || '', nitrogen: prefill.nitrogen || '',
-    phosphorus: prefill.phosphorus || '', potassium: prefill.potassium || '',
-    organic_carbon: prefill.organic_carbon || '', zinc: '', sulfur: '', iron: '',
+  // ── Form state
+  const [crop,         setCrop]         = useState('');
+  const [farmSize,     setFarmSize]     = useState('');
+  const [sowingDate,   setSowingDate]   = useState('');
+  const [nutrients,    setNutrients]    = useState({
+    ph: '', nitrogen: '', phosphorus: '', potassium: '',
+    organic_carbon: '', zinc: '', sulfur: '', iron: '',
   });
-  const [errors,   setErrors]   = useState({});
-  const [loading,  setLoading]  = useState(false);
-  const [showCrop, setShowCrop] = useState(false);
-  const [showPick, setShowPick] = useState(false);
-  const [pDay,     setPDay]     = useState(new Date().getDate());
-  const [pMonth,   setPMonth]   = useState(new Date().getMonth() + 1);
-  const [pYear,    setPYear]    = useState(new Date().getFullYear());
+  const [errors,       setErrors]       = useState({});
+  const [loading,      setLoading]      = useState(false);
+  const [showCropPicker, setShowCropPicker] = useState(false);
 
-  const fade = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  // Fade-in animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
   }, []);
 
-  const setVal = (k, v) => {
-    setVals(p => ({ ...p, [k]: v }));
-    if (errors[k]) setErrors(p => ({ ...p, [k]: null }));
+  // ── Helpers
+  const selectedCrop = CROPS.find(c => c.id === crop);
+
+  const setNutrient = (key, val) => {
+    setNutrients(prev => ({ ...prev, [key]: val }));
+    // Clear error on change
+    if (errors[key]) setErrors(prev => ({ ...prev, [key]: null }));
   };
 
-  const confirmDate = () => {
-    const iso = `${pYear}-${String(pMonth).padStart(2,'0')}-${String(pDay).padStart(2,'0')}`;
-    setSowDate(iso);
-    setShowPick(false);
-  };
-
+  // ── Validation
   const validate = () => {
-    const e = {};
-    if (!crop)                                      e.crop = 'Select a crop';
-    if (!farmSize || isNaN(farmSize) || +farmSize<=0) e.farmSize = 'Enter valid farm size';
-    ['ph','nitrogen','phosphorus','potassium'].forEach(k => {
-      if (!vals[k] || isNaN(vals[k])) e[k] = 'Required';
+    const newErrors = {};
+    if (!crop) newErrors.crop = t('soil_input.crop_label') + ' ' + t('common.error').toLowerCase();
+    if (!farmSize || isNaN(farmSize) || Number(farmSize) <= 0) {
+      newErrors.farmSize = t('soil_input.farm_size');
+    }
+    const requiredKeys = ['ph', 'nitrogen', 'phosphorus', 'potassium'];
+    requiredKeys.forEach(key => {
+      const val = nutrients[key];
+      if (!val || isNaN(val)) {
+        newErrors[key] = t('soil_input.error_required').split(',')[0];
+      } else {
+        const field = NUTRIENT_FIELDS.find(f => f.key === key);
+        const num = Number(val);
+        if (num < field.min || num > field.max) {
+          newErrors[key] = `${field.min} – ${field.max}`;
+        }
+      }
     });
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    ['organic_carbon', 'zinc', 'sulfur', 'iron'].forEach(key => {
+      const val = nutrients[key];
+      if (val && (isNaN(val) || Number(val) < 0)) {
+        newErrors[key] = t('common.error');
+      }
+    });
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
+  // ── Submit
   const handleSubmit = async () => {
-    if (!validate()) { Alert.alert('Missing Fields', 'Please fill all required fields.'); return; }
+    if (!validate()) {
+      Alert.alert(t('common.error'), t('soil_input.error_required'));
+      return;
+    }
+
     setLoading(true);
     try {
       const payload = {
-        crop, farm_size_acres: +farmSize, sowing_date: sowDate || null,
-        ph: +vals.ph, nitrogen: +vals.nitrogen,
-        phosphorus: +vals.phosphorus, potassium: +vals.potassium,
-        organic_carbon: vals.organic_carbon ? +vals.organic_carbon : null,
-        zinc:   vals.zinc   ? +vals.zinc   : null,
-        sulfur: vals.sulfur ? +vals.sulfur : null,
-        iron:   vals.iron   ? +vals.iron   : null,
+        crop,
+        farm_size_acres: Number(farmSize),
+        sowing_date: sowingDate || null,
+        ph:           Number(nutrients.ph),
+        nitrogen:     Number(nutrients.nitrogen),
+        phosphorus:   Number(nutrients.phosphorus),
+        potassium:    Number(nutrients.potassium),
+        organic_carbon: nutrients.organic_carbon ? Number(nutrients.organic_carbon) : null,
+        zinc:   nutrients.zinc   ? Number(nutrients.zinc)   : null,
+        sulfur: nutrients.sulfur ? Number(nutrients.sulfur) : null,
+        iron:   nutrients.iron   ? Number(nutrients.iron)   : null,
         language: i18n.language || 'en',
       };
-      const res = await submitSoilData(payload);
-      if (res.data?.success) {
-        await saveLastScanId(res.data.scan_id);
+
+      const response = await submitSoilData(payload);
+
+      if (response.data.success) {
+        const { scan_id, advisory } = response.data;
+
+        // Save scan ID so HomeScreen can load it
+        await saveLastScanId(scan_id);
+
+        // Go to Advisory Result screen
         navigation.replace('AdvisoryResult', {
-          advisory: res.data.advisory, scan_id: res.data.scan_id, crop, farmSize, sowing_date: sowDate || null,
+          advisory,
+          scan_id,
+          crop,
+          farmSize,
+          sowing_date: sowingDate || null,
         });
       }
     } catch (err) {
-      const msg = err?.status === 401 ? 'Session expired, please login again.'
-        : err?.status === 500 ? 'Server error, please try again.'
-        : err?.message || 'No connection. Check your internet.';
-      Alert.alert('Submission Failed', msg);
-    } finally { setLoading(false); }
+      Alert.alert(
+        'Submission Failed',
+        err.message || 'Could not connect to server. Make sure the backend is running.'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const selCrop = CROPS.find(c => c.id === crop);
-
+  // ── Render
   return (
-    <View style={st.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
-      <View style={st.header}>
-        <View style={st.blob} />
-        <View style={st.headerTop}>
-          <TouchableOpacity style={st.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={st.backText}>{'\u2190'} Back</Text>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerBubble} />
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={st.scanShortcut} onPress={() => navigation.navigate('OCR')}>
-            <Text style={st.scanShortcutText}>{'\u{1F4F7}'} Scan Card</Text>
+
+          {/* OCR shortcut button */}
+          <TouchableOpacity
+            style={styles.ocrShortcut}
+            onPress={() => navigation.navigate('OCR')}
+          >
+            <Text style={styles.ocrShortcutEmoji}>📷</Text>
+            <Text style={styles.ocrShortcutText}>{t('soil_input.scan_card')}</Text>
           </TouchableOpacity>
         </View>
-        <Text style={st.headerTitle}>{'\u{1F52C}'} {t('soil_input.title') || 'Enter Soil Values'}</Text>
-        <Text style={st.headerSub}>{t('soil_input.subtitle') || 'Fill in values from your Soil Health Card'}</Text>
+
+        <Text style={styles.headerTitle}>🔬 {t('soil_input.title')}</Text>
+        <Text style={styles.headerSub}>{t('soil_input.subtitle')}</Text>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Animated.ScrollView style={{ opacity: fade }} contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.kav}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View style={{ opacity: fadeAnim }}>
 
-          {/* CROP & FARM */}
-          <View style={[st.card, shadows.sm]}>
-            <Text style={st.secLabel}>CROP & FARM DETAILS</Text>
+            {/* ── SECTION 1: CROP & FARM ─────────────────────────────── */}
+            <View style={[styles.card, shadows.sm]}>
+              <Text style={styles.cardTitle}>🌾 {t('soil_input.section_farm')}</Text>
 
-            <Text style={st.label}>{'\u{1F33E}'} {t('soil_input.crop_label') || 'Select Crop'} <Text style={st.req}>*</Text></Text>
-            <TouchableOpacity style={[st.inputRow, errors.crop && st.inputError]} onPress={() => setShowCrop(true)}>
-              {selCrop ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                  <Text style={{ fontSize: 20 }}>{selCrop.emoji}</Text>
-                  <Text style={{ fontSize: fontSizes.md, fontWeight: fontWeights.semibold, color: colors.textPrimary }}>{selCrop.label}</Text>
-                </View>
-              ) : (
-                <Text style={{ flex: 1, fontSize: fontSizes.md, color: colors.placeholder }}>Tap to select crop…</Text>
-              )}
-              <Text style={{ color: colors.textMuted }}>{'\u25BE'}</Text>
-            </TouchableOpacity>
-            {errors.crop ? <Text style={st.errorText}>{errors.crop}</Text> : null}
-
-            {/* Crop chips */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
-              {CROPS.map(c => (
-                <TouchableOpacity
-                  key={c.id}
-                  style={[st.chip, crop === c.id && st.chipActive]}
-                  onPress={() => { setCrop(c.id); setErrors(p => ({ ...p, crop: null })); }}
-                >
-                  <Text style={{ fontSize: 18, marginRight: 4 }}>{c.emoji}</Text>
-                  <Text style={[st.chipText, crop === c.id && st.chipTextActive]}>{c.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={st.rowTwo}>
-              <View style={{ flex: 1 }}>
-                <Text style={st.label}>{t('soil_input.farm_size') || 'Farm Size'} <Text style={st.req}>*</Text></Text>
-                <View style={[st.inputRow, errors.farmSize && st.inputError]}>
-                  <TextInput style={st.input} placeholder="e.g. 2.5" placeholderTextColor={colors.placeholder}
-                    keyboardType="decimal-pad" value={farmSize} onChangeText={v => { setFarmSize(v); setErrors(p => ({ ...p, farmSize: null })); }} />
-                  <Text style={st.unit}>acres</Text>
-                </View>
-                {errors.farmSize ? <Text style={st.errorText}>{errors.farmSize}</Text> : null}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={st.label}>{'\u{1F4C5}'} Sowing Date</Text>
-                <TouchableOpacity style={[st.inputRow, { paddingVertical: 0 }]} onPress={() => setShowPick(true)}>
-                  <Text style={[st.input, { paddingVertical: 12 }, !sowDate && { color: colors.placeholder }]}>
-                    {sowDate ? `${sowDate.split('-')[2]}/${sowDate.split('-')[1]}/${sowDate.split('-')[0]}` : 'Pick date'}
+              {/* Crop Selector */}
+              <Text style={styles.fieldLabel}>
+                {t('soil_input.crop_label')} <Text style={styles.required}>*</Text>
+              </Text>
+              <TouchableOpacity
+                style={[styles.cropSelector, errors.crop && styles.inputRowError]}
+                onPress={() => setShowCropPicker(true)}
+              >
+                {selectedCrop ? (
+                  <View style={styles.cropSelectorFilled}>
+                    <Text style={styles.cropSelectorEmoji}>{selectedCrop.emoji}</Text>
+                    <Text style={styles.cropSelectorLabel}>{selectedCrop.label}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.cropSelectorPlaceholder}>
+                    {t('soil_input.crop_placeholder')}
                   </Text>
-                  <Text style={{ fontSize: 18 }}>{'\u{1F4C5}'}</Text>
-                </TouchableOpacity>
-                <Text style={st.optTag}>optional</Text>
+                )}
+                <Text style={styles.cropSelectorArrow}>▾</Text>
+              </TouchableOpacity>
+              {errors.crop && <Text style={styles.fieldError}>{errors.crop}</Text>}
+
+              <View style={styles.rowInputs}>
+                <View style={[styles.halfField, styles.halfFieldLeft]}>
+                  <Text style={styles.fieldLabel}>
+                    {t('soil_input.farm_size')} <Text style={styles.required}>*</Text>
+                  </Text>
+                  <View style={[styles.inputRow, errors.farmSize && styles.inputRowError]}>
+                    <TextInput
+                      style={styles.fieldInput}
+                      placeholder="e.g. 2.5"
+                      placeholderTextColor={colors.placeholder}
+                      keyboardType="decimal-pad"
+                      value={farmSize}
+                      onChangeText={v => { setFarmSize(v); if (errors.farmSize) setErrors(p => ({...p, farmSize: null})); }}
+                    />
+                    <Text style={styles.unitLabel}>{t('soil_input.farm_size_unit')}</Text>
+                  </View>
+                  {errors.farmSize && <Text style={styles.fieldError}>{errors.farmSize}</Text>}
+                </View>
+
+                {/* Sowing Date */}
+                <View style={styles.halfField}>
+                  <Text style={styles.fieldLabel}>{t('soil_input.sowing_date')}</Text>
+                  <View style={styles.inputRow}>
+                    <TextInput
+                      style={styles.fieldInput}
+                      placeholder={t('soil_input.sowing_date_placeholder')}
+                      placeholderTextColor={colors.placeholder}
+                      value={sowingDate}
+                      onChangeText={setSowingDate}
+                      maxLength={10}
+                    />
+                  </View>
+                  <Text style={styles.optionalTag}>{t('common.cancel').replace('Cancel','').trim() || 'optional'}</Text>
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* REQUIRED NUTRIENTS */}
-          <View style={[st.card, shadows.sm]}>
-            <Text style={st.secLabel}>REQUIRED NUTRIENTS</Text>
-            {REQUIRED.map(f => (
-              <NutField key={f.key} f={f} value={vals[f.key]} onChange={v => setVal(f.key, v)} error={errors[f.key]} />
-            ))}
-          </View>
+            {/* ── SECTION 2: REQUIRED NUTRIENTS ─────────────────────── */}
+            <View style={[styles.card, shadows.sm]}>
+              <Text style={styles.cardTitle}>📊 {t('soil_input.section_nutrients')}</Text>
+              <Text style={styles.cardSub}>{t('soil_input.subtitle')} ({t('soil_input.error_required').split(',')[0]})</Text>
+              {NUTRIENT_FIELDS.filter(f => f.required).map(field => (
+                <NutrientInput key={field.key} field={field} value={nutrients[field.key]} onChange={v => setNutrient(field.key, v)} error={errors[field.key]} />
+              ))}
+            </View>
 
-          {/* OPTIONAL NUTRIENTS */}
-          <View style={[st.card, shadows.sm]}>
-            <Text style={st.secLabel}>OPTIONAL NUTRIENTS <Text style={st.optTag}>(leave blank if not on card)</Text></Text>
-            {OPTIONAL.map(f => (
-              <NutField key={f.key} f={f} value={vals[f.key]} onChange={v => setVal(f.key, v)} error={errors[f.key]} />
-            ))}
-          </View>
+            {/* ── SECTION 3: OPTIONAL NUTRIENTS ─────────────────────── */}
+            <View style={[styles.card, shadows.sm]}>
+              <Text style={styles.cardTitle}>
+                🧪 {t('soil_input.section_nutrients')}{' '}
+                <Text style={styles.optionalTag}>optional</Text>
+              </Text>
+              <Text style={styles.cardSub}>Leave blank if not on your card</Text>
+              {NUTRIENT_FIELDS.filter(f => !f.required).map(field => (
+                <NutrientInput
+                  key={field.key}
+                  field={field}
+                  value={nutrients[field.key]}
+                  onChange={v => setNutrient(field.key, v)}
+                  error={errors[field.key]}
+                />
+              ))}
+            </View>
 
-          {/* SUBMIT */}
-          <TouchableOpacity style={[st.submitBtn, loading && { opacity: 0.7 }]} onPress={handleSubmit} disabled={loading} activeOpacity={0.85}>
-            {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={st.submitText}>{t('soil_input.submit') || 'Get Advisory'} {'\u{1F52C}'}</Text>}
-          </TouchableOpacity>
+            {/* ── SUBMIT BUTTON ──────────────────────────────────────── */}
+            <TouchableOpacity
+              style={[styles.submitBtn, loading && styles.submitBtnLoading]}
+              onPress={handleSubmit}
+              disabled={loading}
+              activeOpacity={0.88}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.textOnPrimary} size="small" />
+              ) : (
+                <Text style={styles.submitBtnText}>{t('soil_input.submit')} 🔬</Text>
+              )}
+            </TouchableOpacity>
 
-        </Animated.ScrollView>
+            <Text style={styles.submitHint}>{t('soil_input.submitting')}</Text>
+
+          </Animated.View>
+        </ScrollView>
       </KeyboardAvoidingView>
 
       {/* Crop Picker Modal */}
-      <Modal visible={showCrop} transparent animationType="slide" onRequestClose={() => setShowCrop(false)}>
-        <View style={st.mOverlay}>
-          <View style={st.mSheet}>
-            <View style={st.mHandle} />
-            <Text style={st.mTitle}>Select Crop</Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {CROPS.map(c => (
-                <TouchableOpacity key={c.id} style={[st.mOption, crop===c.id && st.mOptionActive]}
-                  onPress={() => { setCrop(c.id); setShowCrop(false); }}>
-                  <Text style={{ fontSize: 24, marginRight: 12 }}>{c.emoji}</Text>
-                  <Text style={[st.mOptionText, crop===c.id && { color: colors.primary, fontWeight: fontWeights.bold }]}>{c.label}</Text>
-                  {crop===c.id && <Text style={{ color: colors.primary, marginLeft: 'auto', fontWeight: fontWeights.bold }}>{'\u2713'}</Text>}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Date Picker Modal */}
-      <Modal visible={showPick} transparent animationType="slide" onRequestClose={() => setShowPick(false)}>
-        <View style={st.dpOverlay}>
-          <View style={st.dpSheet}>
-            <View style={st.dpHandle} />
-            <Text style={st.dpTitle}>{'\u{1F4C5}'} Sowing Date</Text>
-            <Text style={st.dpSub}>The day you sow / will sow seeds</Text>
-            <View style={st.dpCols}>
-              <View style={{ flex: 1 }}>
-                <Text style={st.dpColLabel}>Day</Text>
-                <ScrollView style={st.dpScroll} snapToInterval={44} decelerationRate="fast" showsVerticalScrollIndicator={false}>
-                  {Array.from({length:31},(_,i)=>i+1).map(d=>(
-                    <TouchableOpacity key={d} style={[st.dpItem, pDay===d&&st.dpActive]} onPress={()=>setPDay(d)}>
-                      <Text style={[st.dpText, pDay===d&&st.dpTextActive]}>{String(d).padStart(2,'0')}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-              <View style={{ flex: 1.6 }}>
-                <Text style={st.dpColLabel}>Month</Text>
-                <ScrollView style={st.dpScroll} snapToInterval={44} decelerationRate="fast" showsVerticalScrollIndicator={false}>
-                  {MONTHS.map((m,i)=>(
-                    <TouchableOpacity key={i} style={[st.dpItem, pMonth===i+1&&st.dpActive]} onPress={()=>setPMonth(i+1)}>
-                      <Text style={[st.dpText, pMonth===i+1&&st.dpTextActive]}>{m}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={st.dpColLabel}>Year</Text>
-                <ScrollView style={st.dpScroll} snapToInterval={44} decelerationRate="fast" showsVerticalScrollIndicator={false}>
-                  {[2024,2025,2026,2027,2028].map(y=>(
-                    <TouchableOpacity key={y} style={[st.dpItem, pYear===y&&st.dpActive]} onPress={()=>setPYear(y)}>
-                      <Text style={[st.dpText, pYear===y&&st.dpTextActive]}>{y}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </View>
-            <View style={st.dpPreview}>
-              <Text style={st.dpPreviewLabel}>Selected: </Text>
-              <Text style={st.dpPreviewDate}>{String(pDay).padStart(2,'0')}/{String(pMonth).padStart(2,'0')}/{pYear}</Text>
-            </View>
-            <View style={st.dpBtns}>
-              <TouchableOpacity style={st.dpCancel} onPress={() => setShowPick(false)}>
-                <Text style={st.dpCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={st.dpConfirm} onPress={confirmDate}>
-                <Text style={st.dpConfirmText}>{'\u2713'} Confirm</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
+      <CropPickerModal
+        visible={showCropPicker}
+        selected={crop}
+        onSelect={setCrop}
+        onClose={() => setShowCropPicker(false)}
+      />
     </View>
   );
 }
 
-const st = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    backgroundColor: colors.primary, paddingTop: STATUS_HEIGHT + 12,
-    paddingBottom: spacing.xxl, paddingHorizontal: spacing.lg,
-    borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden',
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
-  blob: { position: 'absolute', top: -50, right: -40, width: 160, height: 160, borderRadius: 80, backgroundColor: colors.primaryLight, opacity: 0.25 },
-  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  backBtn: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.sm },
-  backText: { color: '#fff', fontSize: fontSizes.sm, fontWeight: fontWeights.semibold },
-  scanShortcut: { backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-  scanShortcutText: { color: '#fff', fontSize: fontSizes.sm, fontWeight: fontWeights.semibold },
-  headerTitle: { fontSize: 26, fontWeight: fontWeights.extrabold, color: '#fff', marginBottom: 4 },
-  headerSub: { fontSize: fontSizes.sm, color: 'rgba(255,255,255,0.75)' },
-  scroll: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
-  secLabel: { fontSize: fontSizes.xs, fontWeight: fontWeights.bold, color: colors.textMuted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: spacing.md },
-  label: { fontSize: fontSizes.sm, fontWeight: fontWeights.semibold, color: colors.textPrimary, marginBottom: 6, marginTop: spacing.sm },
-  req: { color: colors.statusPoor },
-  optTag: { fontSize: fontSizes.xs, color: colors.textMuted, fontStyle: 'italic', marginTop: 2 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.inputBackground, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, marginBottom: 4 },
-  inputFocused: { borderColor: colors.borderFocus, backgroundColor: colors.surface },
-  inputError: { borderColor: colors.statusPoor, backgroundColor: '#FFF5F5' },
-  input: { flex: 1, fontSize: fontSizes.md, color: colors.textPrimary, paddingVertical: Platform.OS === 'ios' ? 14 : 10 },
-  unit: { fontSize: fontSizes.sm, color: colors.textMuted, fontWeight: fontWeights.semibold, marginLeft: spacing.xs },
-  errorText: { fontSize: fontSizes.xs, color: colors.statusPoor, marginTop: 2 },
-  rowTwo: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  chip: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 7, marginRight: spacing.sm, backgroundColor: colors.surface },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: fontSizes.sm, color: colors.textSecondary, fontWeight: fontWeights.medium },
-  chipTextActive: { color: '#fff', fontWeight: fontWeights.bold },
-  fieldWrap: { marginBottom: spacing.sm },
-  fieldTop: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  fEmoji: { fontSize: 18, width: 26 },
-  fLabel: { flex: 1, fontSize: fontSizes.sm, fontWeight: fontWeights.semibold, color: colors.textPrimary },
-  fHint: { fontSize: fontSizes.xs, color: colors.textMuted },
-  submitBtn: { backgroundColor: colors.primary, borderRadius: radius.lg, paddingVertical: 18, alignItems: 'center', ...shadows.md },
-  submitText: { fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: '#fff' },
-  // Crop modal
-  mOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  mSheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, maxHeight: '70%' },
-  mHandle: { width: 40, height: 4, backgroundColor: '#DDD', borderRadius: 2, alignSelf: 'center', marginBottom: spacing.md },
-  mTitle: { fontSize: fontSizes.xl, fontWeight: fontWeights.bold, color: colors.textPrimary, marginBottom: spacing.md, textAlign: 'center' },
-  mOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: spacing.md, borderRadius: radius.md, marginBottom: 2 },
-  mOptionActive: { backgroundColor: colors.primarySurface },
-  mOptionText: { fontSize: fontSizes.lg, color: colors.textPrimary, fontWeight: fontWeights.medium },
-  // Date picker modal
-  dpOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  dpSheet: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.xl, paddingBottom: spacing.xxxl },
-  dpHandle: { width: 40, height: 4, backgroundColor: '#DDD', borderRadius: 2, alignSelf: 'center', marginBottom: spacing.lg },
-  dpTitle: { fontSize: fontSizes.xl, fontWeight: fontWeights.bold, color: colors.textPrimary, textAlign: 'center', marginBottom: 4 },
-  dpSub: { fontSize: fontSizes.sm, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg },
-  dpCols: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  dpColLabel: { fontSize: fontSizes.xs, fontWeight: fontWeights.bold, color: colors.textMuted, textAlign: 'center', marginBottom: spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
-  dpScroll: { maxHeight: 176, borderRadius: radius.md, backgroundColor: '#F8FAF9' },
-  dpItem: { height: 44, justifyContent: 'center', alignItems: 'center', borderRadius: radius.sm },
-  dpActive: { backgroundColor: colors.primary },
-  dpText: { fontSize: fontSizes.md, color: colors.textSecondary, fontWeight: fontWeights.medium },
-  dpTextActive: { color: '#fff', fontWeight: fontWeights.bold },
-  dpPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primarySurface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg },
-  dpPreviewLabel: { fontSize: fontSizes.sm, color: colors.textSecondary },
-  dpPreviewDate: { fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: colors.primary },
-  dpBtns: { flexDirection: 'row', gap: spacing.md },
-  dpCancel: { flex: 1, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, paddingVertical: spacing.md, alignItems: 'center' },
-  dpCancelText: { fontSize: fontSizes.md, color: colors.textSecondary, fontWeight: fontWeights.semibold },
-  dpConfirm: { flex: 2, borderRadius: radius.md, backgroundColor: colors.primary, paddingVertical: spacing.md, alignItems: 'center' },
-  dpConfirmText: { fontSize: fontSizes.md, color: '#fff', fontWeight: fontWeights.bold },
+
+  // Header
+  header: {
+    backgroundColor: colors.primary,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  headerBubble: {
+    position: 'absolute',
+    top: -50,
+    right: -40,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: colors.primaryLight,
+    opacity: 0.35,
+  },
+  backBtn: {},
+  backText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.medium,
+  },
+  ocrShortcut: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  ocrShortcutEmoji: { fontSize: 14, marginRight: 6 },
+  ocrShortcutText: {
+    fontSize: fontSizes.xs,
+    color: '#fff',
+    fontWeight: fontWeights.bold,
+  },
+  headerTitle: {
+    fontSize: fontSizes.xxl,
+    fontWeight: fontWeights.extrabold,
+    color: colors.textOnPrimary,
+    marginBottom: 4,
+  },
+  headerSub: {
+    fontSize: fontSizes.sm,
+    color: 'rgba(255,255,255,0.7)',
+  },
+
+  // KAV + Scroll
+  kav: { flex: 1 },
+  scroll: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+
+  // Card
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  cardTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  cardSub: {
+    fontSize: fontSizes.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+
+  // Crop selector
+  cropSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.inputBackground,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  cropSelectorFilled: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cropSelectorEmoji: { fontSize: 22, marginRight: spacing.sm },
+  cropSelectorLabel: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.semibold,
+    color: colors.textPrimary,
+  },
+  cropSelectorPlaceholder: {
+    fontSize: fontSizes.md,
+    color: colors.placeholder,
+  },
+  cropSelectorArrow: {
+    fontSize: fontSizes.md,
+    color: colors.textSecondary,
+  },
+
+  // Row inputs (farm size + date side by side)
+  rowInputs: {
+    flexDirection: 'row',
+    marginTop: spacing.xs,
+  },
+  halfField: {
+    flex: 1,
+  },
+  halfFieldLeft: {
+    marginRight: spacing.md,
+  },
+
+  // Field
+  fieldWrapper: {
+    marginBottom: spacing.md,
+  },
+  fieldHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  fieldEmoji: { fontSize: 14, marginRight: spacing.xs },
+  fieldLabel: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.semibold,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  fieldHint: {
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+  },
+  required: {
+    color: colors.statusPoor,
+    fontWeight: fontWeights.bold,
+  },
+  optionalTag: {
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+    fontStyle: 'italic',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.inputBackground,
+    overflow: 'hidden',
+  },
+  inputRowFocused: {
+    borderColor: colors.borderFocus,
+    backgroundColor: colors.surface,
+  },
+  inputRowError: {
+    borderColor: colors.statusPoor,
+  },
+  fieldInput: {
+    flex: 1,
+    fontSize: fontSizes.md,
+    color: colors.textPrimary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    fontWeight: fontWeights.medium,
+  },
+  unitLabel: {
+    fontSize: fontSizes.sm,
+    color: colors.textMuted,
+    paddingRight: spacing.md,
+    fontWeight: fontWeights.medium,
+  },
+  fieldError: {
+    fontSize: fontSizes.xs,
+    color: colors.statusPoor,
+    marginTop: 2,
+  },
+
+  // Submit
+  submitBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    ...shadows.md,
+  },
+  submitBtnLoading: {
+    backgroundColor: colors.primaryLight,
+  },
+  submitBtnText: {
+    fontSize: fontSizes.xl,
+    fontWeight: fontWeights.bold,
+    color: colors.textOnPrimary,
+    letterSpacing: 0.5,
+  },
+  submitBtnEmoji: {
+    fontSize: fontSizes.xl,
+  },
+  submitHint: {
+    textAlign: 'center',
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+    lineHeight: 18,
+  },
+
+  // Crop Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: spacing.sm,
+  },
+  modalTitle: {
+    fontSize: fontSizes.xl,
+    fontWeight: fontWeights.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  cropOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: 2,
+  },
+  cropOptionSelected: {
+    backgroundColor: colors.primary + '18',
+  },
+  cropEmoji: { fontSize: 24, width: 32, marginRight: spacing.md },
+  cropLabel: {
+    flex: 1,
+    fontSize: fontSizes.lg,
+    color: colors.textPrimary,
+    fontWeight: fontWeights.medium,
+  },
+  cropLabelSelected: {
+    color: colors.primary,
+    fontWeight: fontWeights.bold,
+  },
+  cropCheck: {
+    fontSize: fontSizes.lg,
+    color: colors.primary,
+    fontWeight: fontWeights.bold,
+  },
 });

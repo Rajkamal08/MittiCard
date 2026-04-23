@@ -1,238 +1,393 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  StatusBar, Platform, Animated, ActivityIndicator, Alert,
-  KeyboardAvoidingView, ScrollView,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  StatusBar,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Animated,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
 import { sendOTP } from '../services/api';
-import { useTranslation } from 'react-i18next';
-
-const STATUS_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44;
 
 export default function LoginScreen({ navigation }) {
-  const { t } = useTranslation();
-  const [phone,   setPhone]   = useState('');
+  const [phone, setPhone]     = useState('');
   const [loading, setLoading] = useState(false);
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(28)).current;
+  const [focused, setFocused] = useState(false);
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 420, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 420, useNativeDriver: true }),
-    ]).start();
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 700,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
-  const handleSend = async () => {
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length !== 10) {
+  const shakeInput = () => {
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 10,  duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 8,   duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8,  duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0,   duration: 60, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const handleSendOTP = async () => {
+    const cleaned = phone.trim();
+    if (cleaned.length !== 10 || isNaN(cleaned)) {
+      shakeInput();
       Alert.alert('Invalid Number', 'Please enter a valid 10-digit mobile number.');
       return;
     }
     setLoading(true);
     try {
-      await sendOTP(cleaned);
-      navigation.navigate('OTP', { phone: cleaned });
+      const response = await sendOTP(cleaned);
+      if (response.data.success) {
+        navigation.navigate('OTP', {
+          phone: cleaned,
+          dev_otp: response.data.dev_otp,
+        });
+      }
     } catch (err) {
-      const msg = err?.status === 500
-        ? 'Server error, please try again.'
-        : err?.message || 'Could not send OTP. Check your internet.';
-      Alert.alert('Failed to Send OTP', msg);
+      Alert.alert('Error', err.message || 'Failed to send OTP. Check your connection.');
     } finally {
       setLoading(false);
     }
   };
 
+  const isReady = phone.trim().length === 10 && !isNaN(phone.trim());
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
 
-      {/* Top band */}
-      <View style={styles.topBand}>
-        <View style={styles.bandBlob} />
-        <View style={styles.logoRow}>
-          <View style={styles.logoMini}>
-            <Text style={{ fontSize: 28 }}>{'\u{1F331}'}</Text>
-          </View>
-          <View style={{ marginLeft: spacing.md }}>
-            <Text style={styles.bandAppName}>MittiCard</Text>
-            <Text style={styles.bandWelcome}>Welcome Back</Text>
-          </View>
-        </View>
+      {/* ── GREEN HEADER BAND (no overflow:hidden so logo floats freely) ── */}
+      <View style={styles.greenBand}>
+        {/* Decorative circle inside band */}
+        <View style={styles.bandCircle1} />
+        <View style={styles.bandCircle2} />
       </View>
 
+      {/* ── LOGO (absolutely positioned, floats above the band boundary) ── */}
+      <View style={styles.logoWrapper}>
+        <View style={styles.logoBox}>
+          <Text style={styles.logoEmoji}>🌱</Text>
+        </View>
+        <Text style={styles.appName}>MittiCard</Text>
+      </View>
+
+      {/* ── SCROLLABLE CONTENT (starts below the logo) ── */}
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.kav}
       >
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          {/* Floating card */}
-          <Animated.View
-            style={[
-              styles.card,
-              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-            ]}
-          >
-            <Text style={styles.sectionLabel}>LOGIN WITH OTP</Text>
-            <Text style={styles.cardTitle}>{t('login.title') || 'Enter your mobile number'}</Text>
-            <Text style={styles.cardSub}>
-              {t('login.subtitle') || 'We\'ll send a 4-digit code to verify your number'}
-            </Text>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View style={{ opacity: fadeAnim }}>
 
-            {/* Phone input */}
-            <View style={styles.phoneRow}>
-              <View style={styles.countryPill}>
-                <Text style={styles.countryText}>{'\u{1F1EE}\u{1F1F3}'} +91</Text>
-              </View>
-              <TextInput
-                style={styles.phoneInput}
-                placeholder="XXXXXXXXXX"
-                placeholderTextColor={colors.placeholder}
-                keyboardType="phone-pad"
-                maxLength={10}
-                value={phone}
-                onChangeText={setPhone}
-              />
+            {/* Welcome heading */}
+            <Text style={styles.welcomeText}>Welcome to MittiCard</Text>
+            <Text style={styles.subtitle}>Soil health advisory for Indian farmers</Text>
+
+            {/* ── SIGN IN CARD ── */}
+            <View style={[styles.card, shadows.md]}>
+              <Text style={styles.cardTitle}>Sign In</Text>
+              <Text style={styles.cardSubtitle}>Enter your mobile number to continue</Text>
+
+              {/* Label */}
+              <Text style={styles.label}>MOBILE NUMBER</Text>
+
+              {/* Phone input with shake animation */}
+              <Animated.View
+                style={[
+                  styles.inputWrapper,
+                  focused && styles.inputWrapperFocused,
+                  { transform: [{ translateX: shakeAnim }] },
+                ]}
+              >
+                {/* Country code */}
+                <View style={styles.countryCode}>
+                  <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
+                </View>
+                <View style={styles.divider} />
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="98765 43210"
+                  placeholderTextColor={colors.placeholder}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  value={phone}
+                  onChangeText={setPhone}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSendOTP}
+                />
+
+                {phone.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setPhone('')}
+                    style={styles.clearBtn}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  >
+                    <Text style={styles.clearBtnText}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </Animated.View>
+
+              {/* Digit counter */}
+              <Text style={styles.charCount}>{phone.length}/10 digits</Text>
+
+              {/* Send OTP Button */}
+              <TouchableOpacity
+                style={[styles.sendBtn, !isReady && styles.sendBtnDisabled]}
+                onPress={handleSendOTP}
+                disabled={loading || !isReady}
+                activeOpacity={0.85}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={[styles.sendBtnText, !isReady && styles.sendBtnTextDisabled]}>
+                    Get OTP via Voice Call
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
-            <Text style={styles.charCount}>{phone.length}/10</Text>
-
-            {/* Send OTP */}
-            <TouchableOpacity
-              style={[styles.sendBtn, (loading || phone.length !== 10) && styles.sendBtnDisabled]}
-              onPress={handleSend}
-              disabled={loading || phone.length !== 10}
-              activeOpacity={0.82}
-            >
-              {loading
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={styles.sendBtnText}>{t('login.send_otp') || 'Send OTP'}</Text>
-              }
-            </TouchableOpacity>
 
             {/* Footer */}
-            <View style={styles.footerRow}>
-              <Text style={styles.footerText}>{'\u{1F512}'} Your data is safe and secure</Text>
-            </View>
-          </Animated.View>
+            <Text style={styles.footer}>
+              🔒 Your data is safe · No spam guaranteed
+            </Text>
 
-          <Text style={styles.version}>MittiCard v1.0  · Powered by AI</Text>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const BAND_HEIGHT   = 200;
+const LOGO_SIZE     = 80;
+const LOGO_OVERLAP  = 44; // how much logo hangs below the band
 
-  // Top band
-  topBand: {
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+
+  // Green header — NO overflow:hidden so logo can float over the edge
+  greenBand: {
+    height: BAND_HEIGHT,
     backgroundColor: colors.primary,
-    height: 220,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
-    paddingTop: STATUS_HEIGHT + 20,
-    paddingHorizontal: spacing.xl,
-    overflow: 'hidden',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
-  bandBlob: {
-    position: 'absolute', top: -50, right: -50,
-    width: 180, height: 180, borderRadius: 90,
-    backgroundColor: colors.primaryLight, opacity: 0.25,
+  bandCircle1: {
+    position: 'absolute',
+    top: -60,
+    right: -50,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: colors.primaryLight,
+    opacity: 0.35,
   },
-  logoRow: { flexDirection: 'row', alignItems: 'center' },
-  logoMini: {
-    width: 60, height: 60, backgroundColor: '#fff',
-    borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+  bandCircle2: {
+    position: 'absolute',
+    bottom: -30,
+    left: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.primaryDark,
+    opacity: 0.2,
+  },
+
+  // Logo floats above the band boundary — zIndex keeps it on top
+  logoWrapper: {
+    position: 'absolute',
+    top: BAND_HEIGHT - LOGO_OVERLAP,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+    elevation: 10,
+  },
+  logoBox: {
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
     ...shadows.md,
   },
-  bandAppName: {
-    fontSize: fontSizes.xxl, fontWeight: fontWeights.extrabold,
-    color: '#fff', letterSpacing: 1,
+  logoEmoji: {
+    fontSize: 38,
   },
-  bandWelcome: {
-    fontSize: fontSizes.sm, color: 'rgba(255,255,255,0.7)',
-    marginTop: 2,
+  appName: {
+    marginTop: 8,
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.bold,
+    color: colors.textPrimary,
   },
 
+  // KAV covers everything below the top of the band
+  kav: {
+    flex: 1,
+  },
   scroll: {
+    // Push content below: band + logo size + small gap
+    paddingTop: BAND_HEIGHT + LOGO_SIZE - LOGO_OVERLAP + 52,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxxl,
+    paddingBottom: spacing.xxl,
   },
 
-  // Floating card
+  // Welcome text
+  welcomeText: {
+    fontSize: fontSizes.xxl,
+    fontWeight: fontWeights.extrabold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: fontSizes.md,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 22,
+  },
+
+  // Sign in card
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: spacing.xxl,
-    marginTop: -60,
-    ...shadows.xl,
-  },
-  sectionLabel: {
-    fontSize: fontSizes.xs, fontWeight: fontWeights.bold,
-    color: colors.textMuted, letterSpacing: 1.4,
-    textTransform: 'uppercase', marginBottom: spacing.sm,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    marginBottom: spacing.xl,
   },
   cardTitle: {
-    fontSize: fontSizes.xl, fontWeight: fontWeights.bold,
-    color: colors.textPrimary, marginBottom: 6,
+    fontSize: fontSizes.xl,
+    fontWeight: fontWeights.bold,
+    color: colors.textPrimary,
+    marginBottom: 4,
   },
-  cardSub: {
-    fontSize: fontSizes.sm, color: colors.textSecondary,
-    marginBottom: spacing.xl, lineHeight: 20,
+  cardSubtitle: {
+    fontSize: fontSizes.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.xl,
   },
 
-  // Phone row
-  phoneRow: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: spacing.sm, marginBottom: 6,
+  label: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.semibold,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    letterSpacing: 1,
   },
-  countryPill: {
-    backgroundColor: colors.primarySurface,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
+
+  // Phone input
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: colors.primaryMuted,
-  },
-  countryText: {
-    fontSize: fontSizes.md, fontWeight: fontWeights.semibold,
-    color: colors.primaryDark,
-  },
-  phoneInput: {
-    flex: 1,
-    backgroundColor: colors.inputBackground,
-    borderWidth: 1.5, borderColor: colors.border,
+    borderColor: colors.border,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
-    fontSize: fontSizes.xl, fontWeight: fontWeights.semibold,
-    color: colors.textPrimary, letterSpacing: 1.5,
+    backgroundColor: colors.inputBackground,
+    overflow: 'hidden',
+  },
+  inputWrapperFocused: {
+    borderColor: colors.borderFocus,
+    backgroundColor: colors.surface,
+  },
+  countryCode: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  countryCodeText: {
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.semibold,
+    color: colors.textPrimary,
+  },
+  divider: {
+    width: 1,
+    height: 28,
+    backgroundColor: colors.border,
+  },
+  input: {
+    flex: 1,
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.medium,
+    color: colors.textPrimary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    letterSpacing: 1.5,
+  },
+  clearBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  clearBtnText: {
+    fontSize: fontSizes.sm,
+    color: colors.textMuted,
   },
   charCount: {
-    fontSize: fontSizes.xs, color: colors.textMuted,
-    textAlign: 'right', marginBottom: spacing.lg,
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+    textAlign: 'right',
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
   },
 
   // Send button
   sendBtn: {
     backgroundColor: colors.primary,
-    borderRadius: radius.lg,
-    paddingVertical: 16,
+    borderRadius: radius.md,
+    paddingVertical: 14,
     alignItems: 'center',
-    ...shadows.md,
-    marginBottom: spacing.xl,
+    justifyContent: 'center',
+    ...shadows.sm,
   },
-  sendBtnDisabled: { backgroundColor: colors.border },
+  sendBtnDisabled: {
+    backgroundColor: colors.border,
+    elevation: 0,
+    shadowOpacity: 0,
+  },
   sendBtnText: {
-    fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: '#fff',
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.bold,
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
+  sendBtnTextDisabled: {
+    color: colors.textMuted,
   },
 
-  footerRow: { alignItems: 'center' },
-  footerText: { fontSize: fontSizes.sm, color: colors.textMuted },
-  version: {
-    textAlign: 'center', fontSize: fontSizes.xs,
-    color: colors.textMuted, marginTop: spacing.xl,
+  footer: {
+    textAlign: 'center',
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+    letterSpacing: 0.3,
   },
 });

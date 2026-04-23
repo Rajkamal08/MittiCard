@@ -1,147 +1,393 @@
+/**
+ * ProfileScreen.js
+ * Shown ONCE — right after LanguageScreen on first login.
+ * Returning users skip this (isProfileDone flag in AsyncStorage).
+ *
+ * Saves: name, district, state to PostgreSQL via PATCH /auth/profile
+ * Also marks profile as done in AsyncStorage so it's skipped next time.
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  StatusBar, Platform, ScrollView, Animated, ActivityIndicator, Alert,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  StatusBar,
+  ScrollView,
+  Animated,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
-import { updateProfile } from '../services/api';
+import { markProfileDone } from '../services/storage';
+import api from '../services/api';
 
-const STATUS_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44;
+// Indian states list for quick selection
 const STATES = [
-  'Andhra Pradesh','Bihar','Chhattisgarh','Gujarat','Haryana',
-  'Himachal Pradesh','Jharkhand','Karnataka','Madhya Pradesh',
-  'Maharashtra','Odisha','Punjab','Rajasthan','Tamil Nadu',
-  'Telangana','Uttar Pradesh','Uttarakhand','West Bengal',
+  'Andhra Pradesh', 'Bihar', 'Chhattisgarh', 'Gujarat', 'Haryana',
+  'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Madhya Pradesh',
+  'Maharashtra', 'Odisha', 'Punjab', 'Rajasthan', 'Tamil Nadu',
+  'Telangana', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
 ];
 
-export default function ProfileScreen({ navigation }) {
-  const [name,  setName]  = useState('');
+export default function ProfileScreen({ navigation, route }) {
+  const { user, language } = route.params || {};
+  const { t } = useTranslation();
+
+  const [name,     setName]     = useState(user?.name !== 'Farmer' ? (user?.name || '') : '');
   const [district, setDistrict] = useState('');
-  const [state, setState] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [state,    setState]    = useState('');
+  const [saving,   setSaving]   = useState(false);
   const [showStates, setShowStates] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Entrance animation
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 420, useNativeDriver: true }).start();
+    Animated.parallel([
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
+    ]).start();
   }, []);
 
   const handleSave = async () => {
-    if (!name.trim()) { Alert.alert('Name Required', 'Please enter your name.'); return; }
-    setLoading(true);
+    if (!name.trim()) {
+      Alert.alert(
+        language === 'hi' ? 'नाम ज़रूरी है' : 'Name Required',
+        language === 'hi' ? 'कृपया अपना नाम दर्ज करें।' : 'Please enter your name.'
+      );
+      return;
+    }
+
+    setSaving(true);
     try {
-      await updateProfile({ name: name.trim(), district: district.trim(), state });
-      navigation.replace('Main');
+      // Save profile to backend
+      // ⚠️  This calls PATCH /auth/profile — we'll add that route next
+      await api.patch('/auth/profile', {
+        name: name.trim(),
+        district: district.trim(),
+        state: state.trim(),
+        language,
+      });
+
+      // Mark profile as done so this screen is never shown again
+      await markProfileDone();
+
+      // Navigate to Home
+      navigation.replace('Home', { user: { ...user, name: name.trim() } });
+
     } catch (err) {
-      Alert.alert('Error', err?.message || 'Could not save. Try again.');
-    } finally { setLoading(false); }
+      // If the API call fails, still allow them to continue
+      // Profile data is not critical enough to block the app
+      console.warn('ProfileScreen: save failed', err?.message);
+      await markProfileDone();
+      navigation.replace('Home', { user: { ...user, name: name.trim() } });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    // Let the farmer skip — they don't have to fill this
+    await markProfileDone();
+    navigation.replace('Home', { user });
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
-      <View style={styles.header}>
-        <View style={styles.blob} />
-        <Text style={styles.title}>{'\u{1F468}\u200D\u{1F33E}'} Complete Profile</Text>
-        <Text style={styles.sub}>Tell us a bit about yourself</Text>
-        <View style={styles.dots}>
-          {[1,2,3].map(i => <View key={i} style={[styles.dot, i===2 && styles.dotActive]} />)}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
+
+        {/* ── Header ──────────────────────────────────────────────────── */}
+        <View style={styles.header}>
+          <View style={styles.headerBubble} />
+          <Text style={styles.headerEmoji}>👤</Text>
+          <Text style={styles.headerTitle}>{t('profile.title')}</Text>
+          <Text style={styles.headerSub}>{t('profile.subtitle')}</Text>
         </View>
-      </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Animated.View style={{ opacity: fadeAnim }}>
-          <View style={styles.card}>
-            <Text style={styles.sectionLabel}>PERSONAL INFO</Text>
-            <Text style={styles.label}>{'\u{1F464}'} Your Name</Text>
-            <View style={styles.inputWrap}>
-              <TextInput style={styles.input} placeholder="e.g. Ramesh Kumar"
-                placeholderTextColor={colors.placeholder} value={name}
-                onChangeText={setName} autoCapitalize="words" />
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View
+            style={[
+              styles.formCard,
+              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+            ]}
+          >
+            {/* ── Name ──────────────────────────────────────────────── */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>{t('profile.name_label')} *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={t('profile.name_placeholder')}
+                placeholderTextColor={colors.textMuted}
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
             </View>
-          </View>
 
-          <View style={styles.card}>
-            <Text style={styles.sectionLabel}>LOCATION</Text>
-            <Text style={styles.label}>{'\u{1F4CD}'} State</Text>
-            <TouchableOpacity style={styles.inputWrap} onPress={() => setShowStates(v => !v)}>
-              <Text style={[styles.input, !state && { color: colors.placeholder }]}>
-                {state || 'Select your state'}
-              </Text>
-              <Text style={{ color: colors.textMuted }}>{showStates ? '\u25B4' : '\u25BE'}</Text>
-            </TouchableOpacity>
-            {showStates && (
-              <View style={styles.dropdown}>
-                <ScrollView style={{ maxHeight: 190 }} nestedScrollEnabled>
+            {/* ── District ──────────────────────────────────────────── */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>{t('profile.district_label')}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={t('profile.district_placeholder')}
+                placeholderTextColor={colors.textMuted}
+                value={district}
+                onChangeText={setDistrict}
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
+            </View>
+
+            {/* ── State (tap to pick from list) ─────────────────────── */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>{t('profile.state_label')}</Text>
+              <TouchableOpacity
+                style={styles.stateSelector}
+                onPress={() => setShowStates(v => !v)}
+              >
+                <Text style={[
+                  styles.stateSelectorText,
+                  !state && { color: colors.textMuted },
+                ]}>
+                  {state || t('profile.state_placeholder')}
+                </Text>
+                <Text style={styles.dropdownArrow}>
+                  {showStates ? '▲' : '▼'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* State dropdown */}
+              {showStates && (
+                <View style={styles.stateDropdown}>
                   {STATES.map(s => (
-                    <TouchableOpacity key={s} style={[styles.stateRow, s===state && styles.stateRowActive]}
-                      onPress={() => { setState(s); setShowStates(false); }}>
-                      <Text style={[styles.stateText, s===state && { color: colors.primary, fontWeight: fontWeights.bold }]}>{s}</Text>
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.stateItem, state === s && styles.stateItemSelected]}
+                      onPress={() => { setState(s); setShowStates(false); }}
+                    >
+                      <Text style={[
+                        styles.stateItemText,
+                        state === s && styles.stateItemTextSelected,
+                      ]}>
+                        {s}
+                      </Text>
                     </TouchableOpacity>
                   ))}
-                </ScrollView>
+                </View>
+              )}
+            </View>
+
+            {/* ── Phone (read-only, from auth) ──────────────────────── */}
+            {user?.phone && (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>
+                  {language === 'hi' ? 'मोबाइल नंबर' : 'Mobile Number'}
+                </Text>
+                <View style={styles.readOnlyField}>
+                  <Text style={styles.readOnlyText}>+91 {user.phone}</Text>
+                  <Text style={styles.verifiedBadge}>✅ Verified</Text>
+                </View>
               </View>
             )}
-            <Text style={styles.label}>{'\u{1F3D9}'} District</Text>
-            <View style={styles.inputWrap}>
-              <TextInput style={styles.input} placeholder="e.g. Jaipur"
-                placeholderTextColor={colors.placeholder} value={district}
-                onChangeText={setDistrict} autoCapitalize="words" />
-            </View>
-          </View>
 
-          <TouchableOpacity style={[styles.saveBtn, loading && { opacity: 0.7 }]}
-            onPress={handleSave} disabled={loading} activeOpacity={0.85}>
-            {loading ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={styles.saveBtnText}>Save & Continue {'\u2192'}</Text>}
+          </Animated.View>
+
+          {/* ── Buttons ─────────────────────────────────────────────── */}
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            <Text style={styles.saveBtnText}>
+              {saving ? t('profile.saving') : t('profile.save')}
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.skipBtn} onPress={() => navigation.replace('Main')}>
-            <Text style={styles.skipText}>Skip for now</Text>
+
+          <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
+            <Text style={styles.skipBtnText}>
+              {language === 'hi' ? 'अभी नहीं, बाद में' : 'Skip for now'}
+            </Text>
           </TouchableOpacity>
-        </Animated.View>
-      </ScrollView>
-    </View>
+
+        </ScrollView>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+
   header: {
-    backgroundColor: colors.primary, paddingTop: STATUS_HEIGHT + 12,
-    paddingBottom: spacing.xxl, paddingHorizontal: spacing.lg,
-    borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden',
+    backgroundColor: colors.primary,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  blob: {
-    position: 'absolute', top: -50, right: -40, width: 160, height: 160,
-    borderRadius: 80, backgroundColor: colors.primaryLight, opacity: 0.25,
+  headerBubble: {
+    position: 'absolute',
+    top: -40, right: -40,
+    width: 160, height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  title: { fontSize: 26, fontWeight: fontWeights.extrabold, color: '#fff', marginBottom: 4 },
-  sub: { fontSize: fontSizes.sm, color: 'rgba(255,255,255,0.75)', marginBottom: spacing.lg },
-  dots: { flexDirection: 'row', gap: 6 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)' },
-  dotActive: { width: 22, backgroundColor: '#fff', borderRadius: 4 },
-  scroll: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  card: {
-    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,
-    marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, ...shadows.sm,
+  headerEmoji: { fontSize: 40, marginBottom: spacing.xs },
+  headerTitle: {
+    fontSize: fontSizes.xxl,
+    fontWeight: fontWeights.extrabold,
+    color: '#fff',
+    textAlign: 'center',
   },
-  sectionLabel: {
-    fontSize: fontSizes.xs, fontWeight: fontWeights.bold, color: colors.textMuted,
-    letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: spacing.md,
+  headerSub: {
+    fontSize: fontSizes.sm,
+    color: 'rgba(255,255,255,0.75)',
+    textAlign: 'center',
   },
-  label: { fontSize: fontSizes.sm, fontWeight: fontWeights.semibold, color: colors.textPrimary, marginBottom: 6, marginTop: spacing.sm },
-  inputWrap: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.inputBackground,
-    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
-    paddingHorizontal: spacing.lg, marginBottom: spacing.sm,
+
+  scroll: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
   },
-  input: { flex: 1, fontSize: fontSizes.md, color: colors.textPrimary, paddingVertical: Platform.OS === 'ios' ? 14 : 10 },
-  dropdown: { backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm, ...shadows.sm },
-  stateRow: { paddingHorizontal: spacing.lg, paddingVertical: 10 },
-  stateRowActive: { backgroundColor: colors.primarySurface },
-  stateText: { fontSize: fontSizes.md, color: colors.textPrimary },
-  saveBtn: { backgroundColor: colors.primary, borderRadius: radius.lg, paddingVertical: 16, alignItems: 'center', ...shadows.md, marginBottom: spacing.md },
-  saveBtnText: { fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: '#fff' },
-  skipBtn: { alignItems: 'center', paddingVertical: spacing.sm },
-  skipText: { fontSize: fontSizes.sm, color: colors.textMuted, textDecorationLine: 'underline' },
+
+  formCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    gap: spacing.lg,
+    ...shadows.sm,
+  },
+
+  fieldGroup: { gap: spacing.xs },
+  fieldLabel: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.semibold,
+    color: colors.textSecondary,
+  },
+
+  input: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: fontSizes.md,
+    color: colors.textPrimary,
+    backgroundColor: colors.inputBackground,
+  },
+
+  // State picker
+  stateSelector: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.inputBackground,
+  },
+  stateSelectorText: {
+    fontSize: fontSizes.md,
+    color: colors.textPrimary,
+  },
+  dropdownArrow: {
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+  },
+  stateDropdown: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    maxHeight: 220,
+    overflow: 'scroll',
+    ...shadows.sm,
+  },
+  stateItem: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  stateItemSelected: {
+    backgroundColor: colors.primary + '12',
+  },
+  stateItemText: {
+    fontSize: fontSizes.md,
+    color: colors.textPrimary,
+  },
+  stateItemTextSelected: {
+    color: colors.primary,
+    fontWeight: fontWeights.bold,
+  },
+
+  // Read-only phone field
+  readOnlyField: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: '#F5F5F5',
+  },
+  readOnlyText: {
+    fontSize: fontSizes.md,
+    color: colors.textSecondary,
+  },
+  verifiedBadge: {
+    fontSize: fontSizes.xs,
+    color: colors.statusGood,
+    fontWeight: fontWeights.semibold,
+  },
+
+  // Buttons
+  saveBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    ...shadows.md,
+  },
+  saveBtnDisabled: { opacity: 0.7 },
+  saveBtnText: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.bold,
+    color: '#fff',
+  },
+
+  skipBtn: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  skipBtnText: {
+    fontSize: fontSizes.sm,
+    color: colors.textMuted,
+    textDecorationLine: 'underline',
+  },
 });
