@@ -1,97 +1,281 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# 🌱 MittiCard — Soil Health Advisory App
 
-# Getting Started
+> **AI-powered soil health advisory for Indian farmers, built for ICAR Soil Health Cards**
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+[![Backend](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-green)](https://mitticard-backend.onrender.com)
+[![Database](https://img.shields.io/badge/Database-PostgreSQL-blue)](https://render.com)
+[![Mobile](https://img.shields.io/badge/Mobile-React%20Native-61DAFB)](https://reactnative.dev)
+[![OTP](https://img.shields.io/badge/OTP-2Factor%20Voice%20Call-orange)](https://2factor.in)
+[![AI](https://img.shields.io/badge/OCR-Gemini%20Vision%20API-purple)](https://ai.google.dev)
 
-## Step 1: Start Metro
+---
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## 📱 What is MittiCard?
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+MittiCard is a mobile app that helps Indian farmers understand their soil health. A farmer scans their **ICAR Soil Health Card** with the camera, and the app:
 
-```sh
-# Using npm
-npm start
+1. Extracts **8 soil nutrients** (pH, N, P, K, OC, Zn, S, Fe) using Gemini Vision OCR
+2. Runs them through a **rule-based advisory engine**
+3. Returns **crop-specific fertilizer recommendations** in Hindi or English
+4. Shows **cost estimates** and a **crop calendar** with weekly tasks
 
-# OR using Yarn
-yarn start
+FPO (Farmer Producer Organisation) managers get a **web dashboard** showing soil health across all their member farms.
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│              React Native Mobile App                 │
+│  Login → OTP → Language → Profile → Home            │
+│  Manual Entry / Camera OCR → Advisory Result        │
+│  Crop Calendar · TTS Read Aloud · FPO Dashboard     │
+└──────────────────────┬──────────────────────────────┘
+                       │ HTTPS
+┌──────────────────────▼──────────────────────────────┐
+│         Node.js + Express Backend (Render)           │
+│                                                      │
+│  /auth    → Voice OTP (2Factor.in)                  │
+│  /advisory → Advisory Engine + Gemini Vision OCR     │
+│  /fpo     → FPO Dashboard APIs + CSV Export         │
+│  /fpo-dashboard → Web Dashboard (static HTML)       │
+└──────────────────────┬──────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────┐
+│           PostgreSQL Database (Render)               │
+│  users · farms · soil_scans · advisories            │
+│  crop_calendar · fpo_members                        │
+└─────────────────────────────────────────────────────┘
 ```
 
-## Step 2: Build and run your app
+---
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## ✅ Features
 
-### Android
+### 🔐 Authentication
+- Phone number login with **Voice OTP** (2Factor.in)
+- Works on **any Indian mobile number** — no DLT registration needed
+- JWT tokens (30-day validity)
+- Role support: `farmer` / `fpo_manager`
 
-```sh
-# Using npm
-npm run android
+### 📸 Soil Analysis
+- **Camera OCR** — scan ICAR Soil Health Card photo → Gemini Vision extracts nutrients
+- **Manual Entry** — type soil values directly
+- Supports **8 parameters**: pH, Nitrogen, Phosphorus, Potassium, Organic Carbon, Zinc, Sulfur, Iron
 
-# OR using Yarn
-yarn android
+### 🧠 Advisory Engine
+- Rule-based engine for **7 crops**: Wheat, Rice, Maize, Cotton, Sugarcane, Soybean, Groundnut
+- NPK deficiency detection with recommended fertilizer quantities
+- **Cost calculator** — total fertilizer cost in ₹ per acre
+- Soil Health Score **(0–100)**
+- Budget tip for small farmers
+
+### 📅 Crop Calendar
+- Week-by-week farm task timeline from sowing date
+- Stored in database, viewable anytime
+
+### 🌐 Multilingual
+- **Hindi** and **English** support (i18next)
+- **TTS (Text-to-Speech)** reads advisory aloud in selected language
+- Language persisted across sessions
+
+### 👨‍🌾 FPO Dashboard (Web)
+- FPO managers log in at `/fpo-dashboard`
+- View all member farms + latest soil data
+- District-wise deficiency breakdown (N/P/K/OC/Zn/S)
+- Add farmers from district via "+ Add Farmers" modal
+- Export full data as **CSV** for bulk fertilizer ordering
+
+### 🔔 Push Notifications
+- Firebase Cloud Messaging (FCM) infrastructure
+- Daily **8AM IST** cron job sends crop reminders
+
+---
+
+## 🖥️ App Screens
+
+| Screen | Description |
+|--------|-------------|
+| `SplashScreen` | Animated logo on launch |
+| `LoginScreen` | Phone input — **English only** |
+| `OTPScreen` | 6-box OTP entry — **English** |
+| `LanguageScreen` | अपनी भाषा चुनें / Select Language |
+| `ProfileScreen` | Name + district setup (first login) |
+| `HomeScreen` | Dashboard with scan options |
+| `SoilInputScreen` | Manual nutrient entry form |
+| `OCRScreen` | Camera scan + Gemini Vision OCR |
+| `AdvisoryResultScreen` | Full advisory with TTS |
+| `CropCalendarScreen` | Week-by-week crop tasks |
+| `FPODashboardScreen` | FPO manager farm overview |
+
+---
+
+## 🗄️ Database Schema
+
+```sql
+users          — id, name, phone, role, district, state, fcm_token
+farms          — id, user_id, farm_name, size_acres, district, state
+soil_scans     — id, farm_id, input_method (manual/ocr), ph, nitrogen, phosphorus,
+                 potassium, organic_carbon, zinc, sulfur, iron, crop, sowing_date
+advisories     — id, scan_id, recommendations (JSON), soil_health_score,
+                 total_cost, language
+crop_calendar  — id, scan_id, event_date, event_label, reminder_sent
+fpo_members    — id, fpo_id, farm_id
 ```
 
-### iOS
+---
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+## 🔌 API Reference
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+### Auth
+```
+POST /auth/send-otp      { phone }                  → sends voice OTP
+POST /auth/verify-otp    { phone, otp, role }        → returns JWT token
+GET  /auth/me                                        → returns user info
+POST /auth/save-fcm-token { fcm_token }              → saves device token
 ```
 
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
+### Advisory
+```
+POST /advisory/manual    { crop, ph, nitrogen, ... } → returns advisory
+POST /advisory/ocr       { crop, ph, nitrogen, ... } → same, OCR input
+POST /advisory/ocr-scan  { image_base64 }            → extracts soil values
+GET  /advisory/:id                                   → fetch past advisory
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+### FPO Dashboard
+```
+GET  /fpo/farms          → all farms + latest scan data
+GET  /fpo/stats          → deficiency %, avg score, crop distribution
+GET  /fpo/export         → CSV download
+POST /fpo/farms          → create new farm
+POST /fpo/members        → link farm to FPO dashboard
+GET  /fpo/district-farms → browse all farms in district
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### Web Dashboard
+```
+GET  /fpo-dashboard      → opens FPO web dashboard (browser)
+```
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+---
 
-## Step 3: Modify your app
+## 🚀 Deployment
 
-Now that you have successfully run the app, let's make changes!
+### Backend (Render)
+- **Live URL:** `https://mitticard-backend.onrender.com`
+- **FPO Dashboard:** `https://mitticard-backend.onrender.com/fpo-dashboard`
+- Auto-deploys from `main` branch on push
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+### Required Environment Variables (Render Dashboard)
+```env
+TWOFACTOR_API_KEY=your_2factor_api_key
+GEMINI_API_KEY=your_gemini_api_key
+JWT_SECRET=your_jwt_secret
+DB_HOST=your_postgres_host
+DB_USER=your_postgres_user
+DB_PASSWORD=your_postgres_password
+DB_NAME=your_db_name
+DB_PORT=5432
+FIREBASE_PROJECT_ID=your_firebase_project_id
+FIREBASE_CLIENT_EMAIL=your_service_account_email
+FIREBASE_PRIVATE_KEY=your_private_key
+```
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+---
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+## 🛠️ Local Development
 
-## Congratulations! :tada:
+### Backend
+```bash
+cd backend
+npm install
+cp .env.example .env    # fill in your keys
+node index.js
+# Server runs on http://localhost:5000
+```
 
-You've successfully run and modified your React Native App. :partying_face:
+### Mobile App
+```bash
+cd soilapp
+npm install
 
-### Now what?
+# For USB-connected Android device:
+adb reverse tcp:5000 tcp:5000
+npx react-native run-android
+```
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+> In `src/services/api.js`, change `BASE_URL` to `http://localhost:5000` for local dev.
 
-# Troubleshooting
+### Build Release APK
+```bash
+cd soilapp/android
+.\gradlew assembleRelease
+# APK → app/build/outputs/apk/release/app-release.apk
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+# Install via USB:
+adb install app/build/outputs/apk/release/app-release.apk
+```
 
-# Learn More
+---
 
-To learn more about React Native, take a look at the following resources:
+## 📁 Project Structure
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+```
+Soil Health/
+├── backend/
+│   ├── engine/
+│   │   ├── advisor.js        # Rule-based advisory engine (7 crops)
+│   │   ├── ocrExtractor.js   # Gemini Vision API OCR
+│   │   └── validate.js       # Input validation
+│   ├── models/
+│   │   └── createTables.js   # PostgreSQL schema (6 tables)
+│   ├── routes/
+│   │   ├── auth.js           # OTP auth + JWT
+│   │   ├── advisory.js       # advisory + OCR endpoints
+│   │   └── fpo.js            # FPO dashboard APIs
+│   ├── middleware/
+│   │   └── auth.js           # JWT verification middleware
+│   ├── cron/
+│   │   └── reminderCron.js   # 8AM daily FCM push notifications
+│   ├── public/
+│   │   └── fpo.html          # FPO web dashboard (self-contained)
+│   └── index.js              # Express app entry point
+│
+└── soilapp/                  # React Native app
+    └── src/
+        ├── screens/          # 11 app screens
+        ├── services/
+        │   ├── api.js        # All backend API calls
+        │   └── storage.js    # AsyncStorage helpers
+        ├── theme/            # Colors, spacing, typography
+        ├── i18n/             # Hindi + English translations
+        └── engine/           # Client-side helpers
+```
+
+---
+
+## 🔑 Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Mobile App | React Native 0.73 |
+| Backend | Node.js + Express |
+| Database | PostgreSQL (Render) |
+| Auth | JWT + 2Factor.in (Voice OTP) |
+| OCR | Google Gemini Vision API |
+| Push Notifications | Firebase Cloud Messaging |
+| Translations | i18next (Hindi + English) |
+| Text-to-Speech | react-native-tts |
+| Deployment | Render (backend + DB) |
+
+---
+
+## 👨‍💻 Built For
+
+**MittiCard** was built as a soil health advisory platform targeting Indian farmers who receive ICAR Soil Health Cards but have no way to act on the data. The app bridges that gap by turning the printed card into actionable farming guidance — in the farmer's own language, on their phone.
+
+---
+
+*Made with 🌱 for Indian Agriculture*
