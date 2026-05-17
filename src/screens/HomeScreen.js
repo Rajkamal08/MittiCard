@@ -402,10 +402,10 @@ const getSeverityTextColor = (severity) => {
         id: 2, 
         icon: '🔴', 
         severity: 'critical',
-        title: isHindi ? 'यूरिया (नाइट्रोजन) की गंभीर कमी' : 'Critical Nitrogen Deficit', 
+        title: isHindi ? 'नाइट्रोजन की कमी' : 'Low Nitrogen', 
         body: isHindi 
-          ? `आपका नाइट्रोजन स्तर ${ns.nitrogen} kg/ha है। आदर्श: ≥140. पत्तों के समुचित विकास के लिए तत्काल यूरिया या जैविक कम्पोस्ट डालें।` 
-          : `Your Nitrogen is critically low at ${ns.nitrogen} kg/ha (Ideal: ≥140). Apply Urea or Neem Cake compost immediately.`
+          ? `नाइट्रोजन ${ns.nitrogen} kg/ha (कम) है। तत्काल यूरिया या कम्पोस्ट डालें।` 
+          : `Nitrogen is low at ${ns.nitrogen} kg/ha. Apply Urea or Vermicompost.`
       });
     }
     
@@ -415,10 +415,10 @@ const getSeverityTextColor = (severity) => {
         id: 3, 
         icon: '🔴', 
         severity: 'critical',
-        title: isHindi ? 'फॉस्फोरस (DAP) की कमी' : 'Phosphorus is LOW', 
+        title: isHindi ? 'फॉस्फोरस की कमी' : 'Low Phosphorus', 
         body: isHindi 
-          ? `फॉस्फोरस स्तर ${ns.phosphorus} kg/ha है (आदर्श: ≥11)। मजबूत जड़ों के विकास के लिए SSP या DAP का उपयोग करें।` 
-          : `Your Phosphorus is ${ns.phosphorus} kg/ha. Apply Single Super Phosphate (SSP) or DAP to enhance root strength.`
+          ? `फॉस्फोरस ${ns.phosphorus} kg/ha (कम) है। जड़ों के लिए SSP या DAP डालें।` 
+          : `Phosphorus is low at ${ns.phosphorus} kg/ha. Apply SSP or DAP.`
       });
     }
     
@@ -428,10 +428,10 @@ const getSeverityTextColor = (severity) => {
         id: 4, 
         icon: '🟠', 
         severity: 'warning',
-        title: isHindi ? 'पोटैशियम (MOP) की कमी' : 'Potassium is LOW', 
+        title: isHindi ? 'पोटैशियम की कमी' : 'Low Potassium', 
         body: isHindi 
-          ? `पोटैशियम स्तर ${ns.potassium} kg/ha है। फसलों को रोगों से बचाने और फल की गुणवत्ता के लिए MOP खाद डालें।` 
-          : `Your Potassium is ${ns.potassium} kg/ha. Apply Muriate of Potash (MOP) to boost disease resistance.`
+          ? `पोटैशियम ${ns.potassium} kg/ha (कम) है। MOP खाद का छिड़काव करें।` 
+          : `Potassium is low at ${ns.potassium} kg/ha. Apply MOP fertilizer.`
       });
     }
     
@@ -441,10 +441,10 @@ const getSeverityTextColor = (severity) => {
         id: 5, 
         icon: '🌱', 
         severity: 'warning',
-        title: isHindi ? 'जैविक कार्बन स्तर कम है' : 'Organic Carbon LOW', 
+        title: isHindi ? 'जैविक कार्बन की कमी' : 'Low Organic Carbon', 
         body: isHindi 
-          ? `मृदा में जैविक कार्बन कम है। केंचुआ खाद या हरी खाद डालकर मिट्टी की उर्वरा शक्ति को बहाल करें।` 
-          : `Soil carbon is low. Add Vermicompost or green manure to restore long-term microbial health.`
+          ? `जैविक कार्बन ${ns.organic_carbon}% है। केंचुआ या हरी खाद डालें।` 
+          : `Organic carbon is low (${ns.organic_carbon}%). Add Vermicompost.`
       });
     }
     
@@ -456,8 +456,8 @@ const getSeverityTextColor = (severity) => {
         severity: 'warning',
         title: isHindi ? 'जिंक की कमी' : 'Zinc Deficient', 
         body: isHindi 
-          ? `जिंक का स्तर कम है। फसल की वृद्धि और अनाज उत्पादन बढ़ाने के लिए जिंक सल्फेट @ 25 kg/ha डालें।` 
-          : `Your Zinc level is deficient. Apply Zinc Sulphate @ 25 kg/ha to enhance grain yield.`
+          ? `जिंक ${ns.zinc} ppm है। जिंक सल्फेट @ 25 kg/ha का प्रयोग करें।` 
+          : `Zinc is low (${ns.zinc} ppm). Apply Zinc Sulphate @ 25 kg/ha.`
       });
     }
     
@@ -469,11 +469,11 @@ const getSeverityTextColor = (severity) => {
         icon: '⚠️', 
         severity: 'alert',
         title: isHindi 
-          ? `मिट्टी ${isAcid ? 'अत्यधिक अम्लीय (Acidic)' : 'अत्यधिक क्षारीय (Alkaline)'}` 
-          : `pH is ${isAcid ? 'too Acidic' : 'too Alkaline'}`, 
+          ? `pH स्तर ${isAcid ? 'अम्लीय' : 'क्षारीय'} है` 
+          : `pH is ${isAcid ? 'Acidic' : 'Alkaline'}`, 
         body: isHindi 
-          ? (isAcid ? `pH ${ns.ph} है। अम्लता को उदासीन करने के लिए कृषि चूना (Agricultural Lime) डालें।` : `pH ${ns.ph} है। क्षारीयता को ठीक करने के लिए जिप्सम (Gypsum) डालें।`)
-          : (isAcid ? `pH is ${ns.ph}. Apply Agricultural Lime to neutralize acidity.` : `pH is ${ns.ph}. Apply Gypsum to correct alkalinity.`)
+          ? (isAcid ? `pH ${ns.ph} है। उदासीन करने के लिए कृषि चूना डालें।` : `pH ${ns.ph} है। सुधार के लिए जिप्सम का प्रयोग करें।`)
+          : (isAcid ? `pH is ${ns.ph}. Apply Agricultural Lime.` : `pH is ${ns.ph}. Apply Gypsum.`)
       });
     }
     
@@ -486,10 +486,10 @@ const getSeverityTextColor = (severity) => {
           id: 10,
           icon: '🌧️',
           severity: 'info',
-          title: isHindi ? 'मौसम सलाह: यूरिया छिड़काव का सही समय' : 'Weather Alert: Broadcast Urea Now',
+          title: isHindi ? 'मौसम सलाह: यूरिया छिड़काव' : 'Weather: Broadcast Urea',
           body: isHindi
-            ? 'अगले कुछ घंटों में बारिश की संभावना है। नाइट्रोजन के बेहतर अवशोषण के लिए यूरिया का छिड़काव अभी करें!'
-            : 'Rain is forecast in your area. Broadcast Nitrogen/Urea now to maximize rain-driven root absorption!'
+            ? 'बारिश होने वाली है! यूरिया का छिड़काव अभी करें ताकि बेहतर अवशोषण हो सके।'
+            : 'Rain is forecast! Broadcast Urea now to maximize root absorption.'
         });
       }
     }
@@ -499,10 +499,10 @@ const getSeverityTextColor = (severity) => {
         id: 8, 
         icon: '🎉', 
         severity: 'info',
-        title: isHindi ? 'आपकी मिट्टी पूर्णतः स्वस्थ है!' : 'All Nutrients Healthy!', 
+        title: isHindi ? 'मिट्टी पूर्णतः स्वस्थ है!' : 'All Nutrients Healthy!', 
         body: isHindi 
-          ? 'बधाई हो! आपकी मिट्टी उत्तम स्थिति में है। हर मौसम में इसी तरह जांच करते रहें।' 
-          : 'Congratulations! Your soil is in excellent condition. Keep scanning every crop season.'
+          ? 'बधाई हो! आपकी मिट्टी उत्तम स्थिति में है।' 
+          : 'Congratulations! Your soil is in excellent condition.'
       });
     }
     
@@ -511,10 +511,10 @@ const getSeverityTextColor = (severity) => {
       id: 9, 
       icon: '💡', 
       severity: 'info',
-      title: isHindi ? 'उर्वरक उपयोग सलाह' : 'Fertilizer Application Tip', 
+      title: isHindi ? 'उर्वरक छिड़काव सलाह' : 'Fertilizer Application Tip', 
       body: isHindi 
-        ? 'उर्वरकों का छिड़काव सुबह जल्दी या शाम को ढलने के बाद ही करें जब मिट्टी में नमी का स्तर सबसे अच्छा हो।' 
-        : 'Broadcast fertilizers in early morning or late evening when soil moisture is high to prevent volatilization loss.'
+        ? 'छिड़काव सुबह या शाम को करें जब मिट्टी में नमी का स्तर अच्छा हो।' 
+        : 'Broadcast in early morning or late evening for best root absorption.'
     });
 
     return list;

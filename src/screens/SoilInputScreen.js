@@ -43,7 +43,7 @@ const getFields = (t) => [
 ];
 
 // ─── Crop Picker Modal ────────────────────────────────────────────────────────
-function CropPickerModal({ visible, selected, onSelect, onClose, crops }) {
+function CropPickerModal({ visible, selected, onSelect, onClose, crops, isHindi }) {
   return (
     <Modal
       visible={visible}
@@ -54,7 +54,7 @@ function CropPickerModal({ visible, selected, onSelect, onClose, crops }) {
       <TouchableOpacity style={styles.modalOverlay} onPress={onClose} activeOpacity={1}>
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>Select Crop</Text>
+          <Text style={styles.modalTitle}>{isHindi ? 'फसल का चयन करें' : 'Select Crop'}</Text>
           {crops.map(crop => (
             <TouchableOpacity
               key={crop.id}
@@ -127,6 +127,7 @@ function NutrientInput({ field, value, onChange, error }) {
 // ─── Main SoilInputScreen ─────────────────────────────────────────────────────
 export default function SoilInputScreen({ navigation }) {
   const { t, i18n } = useTranslation();
+  const isHindi = i18n.language === 'hi';
   const CROPS        = getCrops(t);
   const NUTRIENT_FIELDS = getFields(t);
 
@@ -146,7 +147,7 @@ export default function SoilInputScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-  }, []);
+  }, [fadeAnim]);
 
   // ── Helpers
   const selectedCrop = CROPS.find(c => c.id === crop);
@@ -252,7 +253,7 @@ export default function SoilInputScreen({ navigation }) {
             style={styles.backBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backText}>{isHindi ? '‹ पीछे' : '‹ Back'}</Text>
           </TouchableOpacity>
 
           {/* OCR shortcut button */}
@@ -283,6 +284,56 @@ export default function SoilInputScreen({ navigation }) {
             {/* ── SECTION 1: CROP & FARM ─────────────────────────────── */}
             <View style={[styles.card, shadows.sm]}>
               <Text style={styles.cardTitle}>🌾 {t('soil_input.section_farm')}</Text>
+
+              {/* Quick Demo Auto-Fill buttons */}
+              <View style={styles.demoRow}>
+                <Text style={styles.demoTitle}>⚡ {isHindi ? 'त्वरित डेमो डेटा भरें:' : 'Quick Auto-Fill Test Data:'}</Text>
+                <View style={styles.demoButtons}>
+                  <TouchableOpacity
+                    style={styles.demoBtn}
+                    onPress={() => {
+                      setCrop('wheat');
+                      setFarmSize('2.5');
+                      setSowingDate('15/11/2026');
+                      setNutrients({
+                        ph: '6.8',
+                        nitrogen: '280',
+                        phosphorus: '18',
+                        potassium: '150',
+                        organic_carbon: '0.8',
+                        zinc: '1.2',
+                        sulfur: '15',
+                        iron: '6.0',
+                      });
+                      setErrors({});
+                    }}
+                  >
+                    <Text style={styles.demoBtnText}>🌱 {isHindi ? 'उपजाऊ मिट्टी' : 'Healthy Soil'}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.demoBtn, styles.demoBtnPoor]}
+                    onPress={() => {
+                      setCrop('wheat');
+                      setFarmSize('2.5');
+                      setSowingDate('15/11/2026');
+                      setNutrients({
+                        ph: '5.2',
+                        nitrogen: '90',
+                        phosphorus: '5',
+                        potassium: '65',
+                        organic_carbon: '0.35',
+                        zinc: '0.4',
+                        sulfur: '6',
+                        iron: '3.5',
+                      });
+                      setErrors({});
+                    }}
+                  >
+                    <Text style={[styles.demoBtnText, styles.demoBtnTextPoor]}>🔴 {isHindi ? 'कमजोर मिट्टी' : 'Deficient Soil'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
               {/* Crop Selector */}
               <Text style={styles.fieldLabel}>
@@ -411,6 +462,7 @@ export default function SoilInputScreen({ navigation }) {
         onSelect={setCrop}
         onClose={() => setShowCropPicker(false)}
         crops={CROPS}
+        isHindi={isHindi}
       />
     </View>
   );
@@ -449,11 +501,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
     opacity: 0.35,
   },
-  backBtn: {},
+  backBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
   backText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
+    color: '#FFFFFF',
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.bold,
   },
   ocrShortcut: {
     flexDirection: 'row',
@@ -700,5 +757,48 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     color: colors.primary,
     fontWeight: fontWeights.bold,
+  },
+  demoRow: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  demoTitle: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.bold,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  demoButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  demoBtn: {
+    flex: 1,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: radius.md,
+    paddingVertical: spacing.xs + 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoBtnPoor: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+  },
+  demoBtnText: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.bold,
+    color: '#047857',
+  },
+  demoBtnTextPoor: {
+    color: '#B91C1C',
   },
 });
