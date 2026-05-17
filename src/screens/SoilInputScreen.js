@@ -43,7 +43,7 @@ const getFields = (t) => [
 ];
 
 // ─── Crop Picker Modal ────────────────────────────────────────────────────────
-function CropPickerModal({ visible, selected, onSelect, onClose }) {
+function CropPickerModal({ visible, selected, onSelect, onClose, crops }) {
   return (
     <Modal
       visible={visible}
@@ -55,7 +55,7 @@ function CropPickerModal({ visible, selected, onSelect, onClose }) {
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>Select Crop</Text>
-          {CROPS.map(crop => (
+          {crops.map(crop => (
             <TouchableOpacity
               key={crop.id}
               style={[
@@ -331,14 +331,28 @@ export default function SoilInputScreen({ navigation }) {
                   <View style={styles.inputRow}>
                     <TextInput
                       style={styles.fieldInput}
-                      placeholder={t('soil_input.sowing_date_placeholder')}
+                      placeholder="DD/MM/YYYY"
                       placeholderTextColor={colors.placeholder}
                       value={sowingDate}
-                      onChangeText={setSowingDate}
+                      onChangeText={(text) => {
+                        // Auto-format: insert slashes as user types
+                        let cleaned = text.replace(/[^0-9]/g, '');
+                        if (cleaned.length > 8) cleaned = cleaned.slice(0, 8);
+                        let formatted = '';
+                        if (cleaned.length > 4) {
+                          formatted = cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4) + '/' + cleaned.slice(4);
+                        } else if (cleaned.length > 2) {
+                          formatted = cleaned.slice(0, 2) + '/' + cleaned.slice(2);
+                        } else {
+                          formatted = cleaned;
+                        }
+                        setSowingDate(formatted);
+                      }}
+                      keyboardType="number-pad"
                       maxLength={10}
                     />
                   </View>
-                  <Text style={styles.optionalTag}>{t('common.cancel').replace('Cancel','').trim() || 'optional'}</Text>
+                  <Text style={styles.optionalTag}>Optional · e.g. 15/06/2026</Text>
                 </View>
               </View>
             </View>
@@ -396,6 +410,7 @@ export default function SoilInputScreen({ navigation }) {
         selected={crop}
         onSelect={setCrop}
         onClose={() => setShowCropPicker(false)}
+        crops={CROPS}
       />
     </View>
   );

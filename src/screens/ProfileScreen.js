@@ -43,6 +43,7 @@ export default function ProfileScreen({ navigation, route }) {
   const [state,    setState]    = useState('');
   const [saving,   setSaving]   = useState(false);
   const [showStates, setShowStates] = useState(false);
+  const [focusedInput, setFocusedInput] = useState(null);
 
   // Entrance animation
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -62,6 +63,17 @@ export default function ProfileScreen({ navigation, route }) {
         language === 'hi' ? 'कृपया अपना नाम दर्ज करें।' : 'Please enter your name.'
       );
       return;
+    }
+
+    if (district.trim()) {
+      const districtRegex = /^[a-zA-Z\s]{3,50}$/;
+      if (!districtRegex.test(district.trim())) {
+        Alert.alert(
+          language === 'hi' ? 'अमान्य जिला' : 'Invalid District',
+          language === 'hi' ? 'कृपया एक मान्य जिले का नाम दर्ज करें (केवल अक्षर)।' : 'Please enter a genuine district name (letters only).'
+        );
+        return;
+      }
     }
 
     setSaving(true);
@@ -107,12 +119,11 @@ export default function ProfileScreen({ navigation, route }) {
         <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
 
         {/* ── Header ──────────────────────────────────────────────────── */}
-        <View style={styles.header}>
-          <View style={styles.headerBubble} />
-          <Text style={styles.headerEmoji}>👤</Text>
-          <Text style={styles.headerTitle}>{t('profile.title')}</Text>
-          <Text style={styles.headerSub}>{t('profile.subtitle')}</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>Complete Your Profile</Text>
+          <View style={styles.titleUnderline} />
         </View>
+        <Text style={styles.subtitle}>Add details for better advisory</Text>
 
         <ScrollView
           contentContainerStyle={styles.scroll}
@@ -127,44 +138,55 @@ export default function ProfileScreen({ navigation, route }) {
           >
             {/* ── Name ──────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>{t('profile.name_label')} *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t('profile.name_placeholder')}
-                placeholderTextColor={colors.textMuted}
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-                returnKeyType="next"
-              />
+              <Text style={styles.fieldLabel}>Your Name *</Text>
+              <View style={[styles.inputWrapper, focusedInput === 'name' && styles.inputWrapperFocused]}>
+                <Text style={styles.inputIcon}>👤</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your name"
+                  placeholderTextColor="#94A3B8"
+                  value={name}
+                  onChangeText={setName}
+                  onFocus={() => setFocusedInput('name')}
+                  onBlur={() => setFocusedInput(null)}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              </View>
             </View>
 
             {/* ── District ──────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>{t('profile.district_label')}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t('profile.district_placeholder')}
-                placeholderTextColor={colors.textMuted}
-                value={district}
-                onChangeText={setDistrict}
-                autoCapitalize="words"
-                returnKeyType="next"
-              />
+              <Text style={styles.fieldLabel}>District</Text>
+              <View style={[styles.inputWrapper, focusedInput === 'district' && styles.inputWrapperFocused]}>
+                <Text style={styles.inputIcon}>📍</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Nagpur"
+                  placeholderTextColor="#94A3B8"
+                  value={district}
+                  onChangeText={setDistrict}
+                  onFocus={() => setFocusedInput('district')}
+                  onBlur={() => setFocusedInput(null)}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              </View>
             </View>
 
             {/* ── State (tap to pick from list) ─────────────────────── */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>{t('profile.state_label')}</Text>
+              <Text style={styles.fieldLabel}>State</Text>
               <TouchableOpacity
-                style={styles.stateSelector}
+                style={[styles.inputWrapper, showStates && styles.inputWrapperFocused]}
                 onPress={() => setShowStates(v => !v)}
               >
+                <Text style={styles.inputIcon}>🏙️</Text>
                 <Text style={[
                   styles.stateSelectorText,
-                  !state && { color: colors.textMuted },
+                  !state && { color: '#94A3B8' },
                 ]}>
-                  {state || t('profile.state_placeholder')}
+                  {state || 'e.g. Maharashtra'}
                 </Text>
                 <Text style={styles.dropdownArrow}>
                   {showStates ? '▲' : '▼'}
@@ -173,7 +195,7 @@ export default function ProfileScreen({ navigation, route }) {
 
               {/* State dropdown */}
               {showStates && (
-                <View style={styles.stateDropdown}>
+                <ScrollView nestedScrollEnabled={true} style={styles.stateDropdown}>
                   {STATES.map(s => (
                     <TouchableOpacity
                       key={s}
@@ -188,22 +210,9 @@ export default function ProfileScreen({ navigation, route }) {
                       </Text>
                     </TouchableOpacity>
                   ))}
-                </View>
+                </ScrollView>
               )}
             </View>
-
-            {/* ── Phone (read-only, from auth) ──────────────────────── */}
-            {user?.phone && (
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>
-                  {language === 'hi' ? 'मोबाइल नंबर' : 'Mobile Number'}
-                </Text>
-                <View style={styles.readOnlyField}>
-                  <Text style={styles.readOnlyText}>+91 {user.phone}</Text>
-                  <Text style={styles.verifiedBadge}>✅ Verified</Text>
-                </View>
-              </View>
-            )}
 
           </Animated.View>
 
@@ -214,14 +223,12 @@ export default function ProfileScreen({ navigation, route }) {
             disabled={saving}
           >
             <Text style={styles.saveBtnText}>
-              {saving ? t('profile.saving') : t('profile.save')}
+              {saving ? 'Saving...' : 'Save & Continue'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
-            <Text style={styles.skipBtnText}>
-              {language === 'hi' ? 'अभी नहीं, बाद में' : 'Skip for now'}
-            </Text>
+            <Text style={styles.skipBtnText}>Skip for now</Text>
           </TouchableOpacity>
 
         </ScrollView>
@@ -232,162 +239,146 @@ export default function ProfileScreen({ navigation, route }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#F8FAF8' },
 
-  header: {
-    backgroundColor: colors.primary,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xxl,
-    paddingHorizontal: spacing.lg,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    overflow: 'hidden',
+  titleContainer: {
     alignItems: 'center',
-    gap: spacing.xs,
+    marginTop: 40,
   },
-  headerBubble: {
-    position: 'absolute',
-    top: -40, right: -40,
-    width: 160, height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  headerEmoji: { fontSize: 40, marginBottom: spacing.xs },
-  headerTitle: {
-    fontSize: fontSizes.xxl,
-    fontWeight: fontWeights.extrabold,
-    color: '#fff',
+  title: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#14532d',
     textAlign: 'center',
   },
-  headerSub: {
-    fontSize: fontSizes.sm,
-    color: 'rgba(255,255,255,0.75)',
+  titleUnderline: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#3FA169',
+    borderRadius: 2,
+    marginTop: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#64748B',
     textAlign: 'center',
+    marginTop: 8,
   },
 
   scroll: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-    gap: spacing.md,
+    padding: 24,
+    paddingBottom: 48,
+    gap: 24,
   },
 
   formCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    gap: spacing.lg,
-    ...shadows.sm,
+    gap: 16,
   },
 
-  fieldGroup: { gap: spacing.xs },
+  fieldGroup: { gap: 8 },
   fieldLabel: {
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.semibold,
-    color: colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#334155',
+    marginLeft: 4,
   },
 
-  input: {
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    fontSize: fontSizes.md,
-    color: colors.textPrimary,
-    backgroundColor: colors.inputBackground,
-  },
-
-  // State picker
-  stateSelector: {
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+  inputWrapper: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.inputBackground,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 16,
   },
+  inputWrapperFocused: {
+    borderColor: '#16A34A',
+    backgroundColor: '#F0FDF4',
+  },
+  inputIcon: {
+    fontSize: 18,
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#0F172A',
+  },
+
+  // State picker specific overrides
   stateSelectorText: {
-    fontSize: fontSizes.md,
-    color: colors.textPrimary,
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#0F172A',
   },
   dropdownArrow: {
-    fontSize: fontSizes.xs,
-    color: colors.textMuted,
+    fontSize: 12,
+    color: '#94A3B8',
   },
   stateDropdown: {
     borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     maxHeight: 220,
-    overflow: 'scroll',
-    ...shadows.sm,
+    marginTop: 4,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   stateItem: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#E2E8F0',
   },
   stateItemSelected: {
-    backgroundColor: colors.primary + '12',
+    backgroundColor: '#EEF7F1',
   },
   stateItemText: {
-    fontSize: fontSizes.md,
-    color: colors.textPrimary,
+    fontSize: 16,
+    color: '#0F172A',
   },
   stateItemTextSelected: {
-    color: colors.primary,
-    fontWeight: fontWeights.bold,
-  },
-
-  // Read-only phone field
-  readOnlyField: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    backgroundColor: '#F5F5F5',
-  },
-  readOnlyText: {
-    fontSize: fontSizes.md,
-    color: colors.textSecondary,
-  },
-  verifiedBadge: {
-    fontSize: fontSizes.xs,
-    color: colors.statusGood,
-    fontWeight: fontWeights.semibold,
+    color: '#1F6E43',
+    fontWeight: '700',
   },
 
   // Buttons
   saveBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
+    backgroundColor: '#16A34A', // stronger green
+    borderRadius: 16,
+    height: 56, // 50-55 as requested
+    justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.md,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
   },
   saveBtnDisabled: { opacity: 0.7 },
   saveBtnText: {
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold,
+    fontSize: 17,
+    fontWeight: '700',
     color: '#fff',
   },
 
   skipBtn: {
-    paddingVertical: spacing.md,
+    paddingVertical: 16,
     alignItems: 'center',
+    marginTop: 8,
   },
   skipBtnText: {
-    fontSize: fontSizes.sm,
-    color: colors.textMuted,
+    fontSize: 15,
+    color: '#64748B',
     textDecorationLine: 'underline',
+    fontWeight: '600',
   },
 });

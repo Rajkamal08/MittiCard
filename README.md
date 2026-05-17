@@ -64,18 +64,19 @@ FPO (Farmer Producer Organisation) managers get a **web dashboard** showing soil
 - **Manual Entry** — type soil values directly
 - Supports **8 parameters**: pH, Nitrogen, Phosphorus, Potassium, Organic Carbon, Zinc, Sulfur, Iron
 
-### 🧠 Advisory Engine
+### 🧠 Premium Advisory Engine & Live Cost Calculator
 - Rule-based engine for **7 crops**: Wheat, Rice, Maize, Cotton, Sugarcane, Soybean, Groundnut
 - NPK deficiency detection with recommended fertilizer quantities
-- **Cost calculator** — total fertilizer cost in ₹ per acre
-- Soil Health Score **(0–100)**
-- Budget tip for small farmers
+- **📊 Dynamic Live Farm Size Calculator**: Dynamic stepper controller (from 0.5 to 50 acres) instantly scales chemical fertilizer bag calculations, dynamizing metric dosage weights and total dynamic cost invoices in real-time.
+- **🌿 "Go Organic" Alternatives Mode**: Live toggle button that swaps chemical suggestions for verified natural alternatives (Neem cake, Vermicompost, Bone meal, Wood ash) mapped dynamically in Hindi and English.
+- Soil Health Score **(0–100)** with warm golden and soft rose coral pastel color boundaries for low scores.
+- Localized budget advice enriched with smart co-op bulk discounts and PM-KISAN subsidized cooperative tips.
 
 ### 📅 Crop Calendar
 - Week-by-week farm task timeline from sowing date
 - Stored in database, viewable anytime
 
-### 🌐 Multilingual
+### 🌐 Multilingual & Reading Aloud
 - **Hindi** and **English** support (i18next)
 - **TTS (Text-to-Speech)** reads advisory aloud in selected language
 - Language persisted across sessions
@@ -87,9 +88,11 @@ FPO (Farmer Producer Organisation) managers get a **web dashboard** showing soil
 - Add farmers from district via "+ Add Farmers" modal
 - Export full data as **CSV** for bulk fertilizer ordering
 
-### 🔔 Push Notifications
+### 🔔 Smart Soil Alerts & Notifications
 - Firebase Cloud Messaging (FCM) infrastructure
 - Daily **8AM IST** cron job sends crop reminders
+- **🌈 Severity-Coded Soil Alerts**: Bottom-sheet panel displays colored notification cards matching alert urgency (Red = Critical, Orange = Warning, Amber = pH Alert, Green = Tip) with high-end left-accent indicator bars.
+- **🌧️ Dynamic Weather-Triggered Sowing Advisories**: Automatically checks local live forecasts from the Open-Meteo API. If upcoming rain is expected, it dynamically injects an actionable advice card telling farmers to broadcast nitrogen/urea now to maximize rain root absorption.
 
 ---
 

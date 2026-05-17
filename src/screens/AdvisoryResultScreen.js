@@ -7,6 +7,7 @@ import {
   StatusBar,
   TouchableOpacity,
   Animated,
+  Alert,
 } from 'react-native';
 import Tts from 'react-native-tts';
 import { useTranslation } from 'react-i18next';
@@ -15,9 +16,9 @@ import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../the
 
 // ─── Score helpers ─────────────────────────────────────────────────────────
 const getScoreColor = score => {
-  if (score >= 71) return colors.statusGood;
-  if (score >= 41) return colors.statusFair;
-  return colors.statusPoor;
+  if (score >= 71) return '#4ADE80'; // Minty emerald green
+  if (score >= 41) return '#FCD34D'; // Golden warm yellow
+  return '#FF8E8E'; // Beautiful soft warm coral rose
 };
 
 // getScoreLabel now needs t() — called from inside component
@@ -138,22 +139,52 @@ const buildSpeechText = (advisory, crop, farmSize) => {
 function ReadAloudButton({ advisory, crop, farmSize }) {
   const { t } = useTranslation();
   const [speaking, setSpeaking] = useState(false);
+  const [engineReady, setEngineReady] = useState(false);
 
   useEffect(() => {
-    // Set TTS language based on user's chosen language
-    // hi-IN = Hindi voice, en-IN = English (Indian accent)
-    const lang = i18n.language === 'hi' ? 'hi-IN' : 'en-IN';
-    Tts.setDefaultLanguage(lang).catch(() => {
-      Tts.setDefaultLanguage('en-US').catch(() => {});
-    });
-    Tts.setDefaultRate(0.5);   // Slow — easier for farmers to follow
-    Tts.setDefaultPitch(1.0);
+    const initTts = async () => {
+      try {
+        // Wait for TTS engine initialization status
+        await Tts.getInitStatus();
+        
+        // Set default language bilingual configuration
+        const lang = i18n.language === 'hi' ? 'hi-IN' : 'en-IN';
+        await Tts.setDefaultLanguage(lang);
+        
+        // Configure audio settings
+        await Tts.setDefaultRate(0.48); // slow rate for clear farm instruction
+        await Tts.setDefaultPitch(1.0);
+        await Tts.setDucking(true); // lower other background app sounds
+        
+        setEngineReady(true);
+      } catch (err) {
+        console.warn('TTS Initialization failed:', err);
+        // If Google TTS engine is completely missing, prompt user to install it
+        if (err && err.code === 'no_engine') {
+          Tts.requestInstallEngine();
+        } else {
+          // fallback to en-US standard engine
+          Tts.setDefaultLanguage('en-US')
+            .then(() => setEngineReady(true))
+            .catch(() => {});
+        }
+      }
+    };
 
+    initTts();
+
+    // Event listeners
     const finishSub = Tts.addEventListener('tts-finish', () => setSpeaking(false));
     const cancelSub = Tts.addEventListener('tts-cancel', () => setSpeaking(false));
+    const errorSub  = Tts.addEventListener('tts-error', (error) => {
+      console.warn('TTS Event error:', error);
+      setSpeaking(false);
+    });
+
     return () => {
       finishSub.remove();
       cancelSub.remove();
+      errorSub.remove();
       Tts.stop();
     };
   }, []);
@@ -163,11 +194,28 @@ function ReadAloudButton({ advisory, crop, farmSize }) {
       Tts.stop();
       setSpeaking(false);
     } else {
+      if (!engineReady) {
+        Alert.alert(
+          'TTS Engine Setting Up',
+          'Please ensure Google Text-to-Speech is enabled in your phone Settings -> Language & Input -> Text-to-Speech output.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
       const text = buildSpeechText(advisory, crop, farmSize);
       setSpeaking(true);
-      Tts.speak(text);
+      
+      // Speak with direct volume configurations
+      Tts.speak(text, {
+        androidParams: {
+          KEY_PARAM_PAN: 0.0,
+          KEY_PARAM_VOLUME: 1.0,
+          KEY_PARAM_STREAM: 'STREAM_MUSIC',
+        }
+      });
     }
-  }, [speaking, advisory, crop, farmSize]);
+  }, [speaking, engineReady, advisory, crop, farmSize]);
 
   return (
     <TouchableOpacity
@@ -175,7 +223,6 @@ function ReadAloudButton({ advisory, crop, farmSize }) {
       onPress={handlePress}
       activeOpacity={0.85}
     >
-      <Text style={styles.ttsBtnEmoji}>{speaking ? '⏹' : '🔊'}</Text>
       <Text style={[styles.ttsBtnText, speaking && styles.ttsBtnTextActive]}>
         {speaking ? t('advisory.stop') : t('advisory.speak')}
       </Text>
@@ -194,7 +241,7 @@ function ScoreRing({ score }) {
       Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
       Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [fadeAnim, scaleAnim]);
 
   return (
     <Animated.View
@@ -204,8 +251,8 @@ function ScoreRing({ score }) {
       ]}
     >
       <View style={[styles.scoreRingInner, { backgroundColor: color + '22' }]}>
-        <Text style={[styles.scoreNum, { color }]}>{score}</Text>
-        <Text style={[styles.scoreOutOf, { color }]}>/100</Text>
+        <Text style={styles.scoreNum}>{score}</Text>
+        <Text style={styles.scoreOutOf}>/100</Text>
       </View>
     </Animated.View>
   );
@@ -246,7 +293,7 @@ function NutrientGauge({ nutrientKey, value, index }) {
       Animated.spring(scaleAnim, { toValue: 1, tension: 60, friction: 7, delay: index * 70, useNativeDriver: true }),
       Animated.timing(fadeAnim,  { toValue: 1, duration: 500, delay: index * 70, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [fadeAnim, index, scaleAnim]);
 
   return (
     <Animated.View style={{ alignItems: 'center', width: 72, opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
@@ -379,7 +426,7 @@ function NutrientRow({ nutrientKey, data, index }) {
       Animated.timing(slideAnim, { toValue: 0, duration: 400, delay: index * 80, useNativeDriver: true }),
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay: index * 80, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [fadeAnim, index, slideAnim]);
 
   return (
     <Animated.View
@@ -415,12 +462,48 @@ function NutrientRow({ nutrientKey, data, index }) {
 }
 
 // ─── Fertilizer Card ───────────────────────────────────────────────────────
-function FertilizerCard({ rec, index }) {
-  // Use values already calculated by backend costCalculator.js
-  // Fields: total_qty ("87.5 kg"), bags_needed (number), total_cost (number)
-  const totalCost = rec.total_cost || 0;
-  const bagsNeeded = rec.bags_needed || 0;
-  const totalQty  = rec.total_qty  || '—';
+// ─── Organic Alternatives Mapper ──────────────────────────────────────────
+const getOrganicAlternative = (fertilizerName, isHindi) => {
+  const name = String(fertilizerName).toUpperCase();
+  if (name.includes('UREA')) {
+    return isHindi 
+      ? '🌿 जैविक विकल्प: नीम खली खाद (20 किलो), गोबर की खाद या केंचुआ खाद (250 किलो) प्रति एकड़ डालें। यह कार्बनिक स्तर बढ़ाता है।'
+      : '🌿 Natural Alternatives: Neem Cake manure (20 kg), compost or Vermicompost (250 kg) per acre. Enhances organic carbon naturally.';
+  }
+  if (name.includes('DAP') || name.includes('SSP') || name.includes('SUPER PHOSPHATE') || name.includes('PHOSPHATE')) {
+    return isHindi
+      ? '🌿 जैविक विकल्प: हड्डी की खाद (हड्डी का चूरा) (50 किलो) या रॉक फॉस्फेट (75 किलो) प्रति एकड़ डालें। फॉस्फोरस का प्राकृतिक स्रोत।'
+      : '🌿 Natural Alternatives: Bone Meal (50 kg) or Rock Phosphate (75 kg) per acre. Excellent natural phosphorus source.';
+  }
+  if (name.includes('MOP') || name.includes('POTASH') || name.includes('POTASSIUM')) {
+    return isHindi
+      ? '🌿 जैविक विकल्प: लकड़ी की राख (60 किलो) या केले के छिलके की खाद प्रति एकड़ डालें। पोटैशियम का प्रचुर जैविक स्रोत।'
+      : '🌿 Natural Alternatives: Wood Ash (60 kg) or Banana peel compost per acre. Plentiful in organic potassium.';
+  }
+  if (name.includes('ZINC')) {
+    return isHindi
+      ? '🌿 जैविक विकल्प: जिंक घोलक बैक्टीरिया (ZSB) से समृद्ध कम्पोस्ट या जैविक कचरा मल्चिंग (Mulching) अपनाएं।'
+      : '🌿 Natural Alternatives: Compost enriched with zinc-solubilizing bacteria (ZSB) or dynamic organic mulch.';
+  }
+  return isHindi
+    ? '🌿 जैविक विकल्प: अच्छी तरह सड़ी हुई गोबर की खाद या केंचुआ खाद डालें। यह मिट्टी की जैविक गतिविधि को पुनर्जीवित करता है।'
+    : '🌿 Natural Alternatives: Well-rotted Cow dung manure (FYM) or Vermicompost. Restores overall soil biology.';
+};
+
+// ─── Fertilizer Card ───────────────────────────────────────────────────────
+function FertilizerCard({ rec, index, scaleMultiplier = 1, organicMode = false }) {
+  const isHindi = i18n.language === 'hi';
+  
+  // Use values dynamically calculated based on farm scale
+  const totalCost = Math.round((rec.total_cost || 0) * scaleMultiplier);
+  const bagsNeeded = Math.round((rec.bags_needed || 0) * scaleMultiplier * 10) / 10;
+  
+  const originalQtyVal = parseFloat(rec.total_qty);
+  let totalQty = rec.total_qty || '—';
+  if (!isNaN(originalQtyVal)) {
+    const unit = rec.total_qty.replace(originalQtyVal.toString(), '').trim() || ' kg';
+    totalQty = `${(Math.round(originalQtyVal * scaleMultiplier * 10) / 10)}${unit}`;
+  }
 
   const slideAnim = useRef(new Animated.Value(40)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -430,10 +513,14 @@ function FertilizerCard({ rec, index }) {
       Animated.timing(slideAnim, { toValue: 0, duration: 450, delay: index * 100, useNativeDriver: true }),
       Animated.timing(fadeAnim,  { toValue: 1, duration: 450, delay: index * 100, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [fadeAnim, index, slideAnim]);
 
   const priorityColor = index === 0 ? colors.statusPoor : index === 1 ? colors.statusWarning : colors.statusGood;
-  const priorityLabel = index === 0 ? '🔥 High' : index === 1 ? '⚡ Medium' : '✅ Low';
+  const priorityLabel = index === 0 
+    ? (isHindi ? '🔥 उच्च' : '🔥 High') 
+    : index === 1 
+      ? (isHindi ? '⚡ मध्यम' : '⚡ Medium') 
+      : (isHindi ? '✅ निम्न' : '✅ Low');
 
   return (
     <Animated.View
@@ -446,7 +533,7 @@ function FertilizerCard({ rec, index }) {
       {/* Priority ribbon */}
       <View style={[styles.priorityBadge, { backgroundColor: priorityColor + '20', borderColor: priorityColor }]}>
         <Text style={[styles.priorityText, { color: priorityColor }]}>
-          {priorityLabel} Priority
+          {priorityLabel} {isHindi ? 'प्राथमिकता' : 'Priority'}
         </Text>
       </View>
 
@@ -458,21 +545,30 @@ function FertilizerCard({ rec, index }) {
       <View style={styles.fertStatsRow}>
         <View style={styles.fertStat}>
           <Text style={styles.fertStatValue} numberOfLines={1} adjustsFontSizeToFit>{totalQty}</Text>
-          <Text style={styles.fertStatLabel}>total qty</Text>
+          <Text style={styles.fertStatLabel}>{isHindi ? 'कुल मात्रा' : 'total qty'}</Text>
         </View>
         <View style={styles.fertStatDivider} />
         <View style={styles.fertStat}>
           <Text style={styles.fertStatValue} numberOfLines={1} adjustsFontSizeToFit>{bagsNeeded}</Text>
-          <Text style={styles.fertStatLabel}>{rec.bag_size || 'bags'}</Text>
+          <Text style={styles.fertStatLabel}>{rec.bag_size || (isHindi ? 'बोरी' : 'bags')}</Text>
         </View>
         <View style={styles.fertStatDivider} />
         <View style={styles.fertStat}>
           <Text style={[styles.fertStatValue, styles.fertCost]} numberOfLines={1} adjustsFontSizeToFit>
             {'₹'}{totalCost.toLocaleString('en-IN')}
           </Text>
-          <Text style={styles.fertStatLabel}>estimated</Text>
+          <Text style={styles.fertStatLabel}>{isHindi ? 'अनुमानित लागत' : 'estimated'}</Text>
         </View>
       </View>
+
+      {/* Organic alternative box */}
+      {organicMode && (
+        <View style={styles.organicBox}>
+          <Text style={styles.organicText}>
+            {getOrganicAlternative(rec.fertilizer, isHindi)}
+          </Text>
+        </View>
+      )}
 
       {/* Application note */}
       {rec.application_note && (
@@ -488,12 +584,19 @@ function FertilizerCard({ rec, index }) {
 export default function AdvisoryResultScreen({ navigation, route }) {
   const { advisory, scan_id, crop, farmSize, sowing_date } = route.params || {};
   const { t } = useTranslation();
+  const isHindi = i18n.language === 'hi';
+
+  const farmSizeNum  = Number(farmSize) || 1;
+  const [liveFarmSize, setLiveFarmSize] = useState(farmSizeNum);
+  const [organicMode, setOrganicMode] = useState(false);
 
   const headerFade = useRef(new Animated.Value(0)).current;
+  const [nutrientTab, setNutrientTab] = useState('chart'); // 'chart' | 'gauges'
+  const [deductionsExpanded, setDeductionsExpanded] = useState(false);
 
   useEffect(() => {
     Animated.timing(headerFade, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-  }, []);
+  }, [headerFade]);
 
   if (!advisory) {
     return (
@@ -508,10 +611,8 @@ export default function AdvisoryResultScreen({ navigation, route }) {
   }
 
   const score        = advisory.soil_health_score || 0;
-  const scoreColor   = getScoreColor(score);
   const nutrientKeys = Object.keys(advisory.nutrient_status || {});
   const recs         = advisory.recommendations || [];
-  const farmSizeNum  = Number(farmSize) || 1;
   const cropLabel    = crop ? crop.charAt(0).toUpperCase() + crop.slice(1) : 'Crop';
 
   return (
@@ -521,14 +622,14 @@ export default function AdvisoryResultScreen({ navigation, route }) {
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* ── HEADER ──────────────────────────────────────────────────── */}
-        <View style={[styles.header, { backgroundColor: scoreColor }]}>
+        <View style={styles.header}>
           <View style={styles.headerBubble} />
 
           <TouchableOpacity
             onPress={() => navigation.navigate('Home')}
             style={styles.backBtn}
           >
-          <Text style={styles.backText}>Home</Text>
+            <Text style={styles.backText}>‹ Home</Text>
           </TouchableOpacity>
 
           <Animated.View style={[styles.headerContent, { opacity: headerFade }]}>
@@ -537,8 +638,20 @@ export default function AdvisoryResultScreen({ navigation, route }) {
 
             {/* Score label */}
             <View style={styles.scoreMeta}>
-              <View style={[styles.scoreLabelBadge, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
-                <Text style={styles.scoreLabelText}>
+              <View style={[
+                styles.scoreLabelBadge, 
+                { 
+                  backgroundColor: 'rgba(255, 255, 255, 0.16)',
+                  borderColor: 'rgba(255, 255, 255, 0.28)',
+                  borderWidth: 1.2,
+                }
+              ]}>
+                <Text style={[
+                  styles.scoreLabelText, 
+                  { 
+                    color: '#FFFFFF' 
+                  }
+                ]}>
                   {getScoreEmoji(score)} {getScoreLabel(score, t)} {t('advisory.score_label')}
                 </Text>
               </View>
@@ -557,34 +670,115 @@ export default function AdvisoryResultScreen({ navigation, route }) {
 
         <View style={styles.body}>
 
-          {/* ── NUTRIENT GAUGES — % of ideal ──────────────────────── */}
-          <View style={[styles.section, shadows.sm, { paddingVertical: 18 }]}>
-            <Text style={styles.sectionTitle}>🎯 Nutrient Levels at a Glance</Text>
-            <Text style={[styles.sectionSub, { marginBottom: 14 }]}>
-              How each nutrient compares to its ideal level
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 2, paddingBottom: 4 }}>
-                {nutrientKeys.map((key, i) => {
-                  const val = advisory.nutrient_status[key]?.value;
-                  if (!IDEAL_VALUES[key]) return null;
-                  return (
-                    <NutrientGauge
-                      key={key}
-                      nutrientKey={key}
-                      value={val}
-                      index={i}
-                    />
-                  );
-                })}
+          {/* ── NUTRIENT SEGMENTED CONTROL DASHBOARD ────────────────── */}
+          <View style={[styles.section, shadows.sm]}>
+            <View style={styles.tabHeaderRow}>
+              <View>
+                <Text style={styles.sectionTitle}>
+                  {isHindi ? '🎯 पोषक तत्व डैशबोर्ड' : '🎯 Nutrient Dashboard'}
+                </Text>
+                <Text style={styles.sectionSub}>
+                  {nutrientTab === 'chart' 
+                    ? (isHindi ? 'वास्तविक बनाम आदर्श मिट्टी मूल्यों की तुलना' : 'Comparison of actual vs ideal soil values') 
+                    : (isHindi ? 'आदर्श स्तरों के प्रतिशत के रूप में पोषक मूल्य' : 'Soil nutrient values as % of ideal levels')}
+                </Text>
               </View>
-            </ScrollView>
+            </View>
+
+            {/* Segmented Control Bar */}
+            <View style={styles.segmentBar}>
+              <TouchableOpacity 
+                style={[styles.segmentBtn, nutrientTab === 'chart' && styles.segmentBtnActive]}
+                onPress={() => setNutrientTab('chart')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.segmentBtnText, nutrientTab === 'chart' && styles.segmentBtnTextActive]}>
+                  {isHindi ? '📊 तुलनात्मक ग्राफ़' : '📊 Visual Trends'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.segmentBtn, nutrientTab === 'gauges' && styles.segmentBtnActive]}
+                onPress={() => setNutrientTab('gauges')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.segmentBtnText, nutrientTab === 'gauges' && styles.segmentBtnTextActive]}>
+                  {isHindi ? '🎯 आदर्श प्रतिशत' : '🎯 Ideal Gauges'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Tab Contents */}
+            {nutrientTab === 'chart' ? (
+              <View style={{ marginTop: 6 }}>
+                <NutrientBarChart nutrientStatus={advisory.nutrient_status || {}} />
+              </View>
+            ) : (
+              <View style={{ marginTop: 6 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 2, paddingBottom: 6 }}>
+                    {nutrientKeys.map((key, i) => {
+                      const val = advisory.nutrient_status[key]?.value;
+                      if (!IDEAL_VALUES[key]) return null;
+                      return (
+                        <NutrientGauge
+                          key={key}
+                          nutrientKey={key}
+                          value={val}
+                          index={i}
+                        />
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
           </View>
 
-          {/* ── CURRENT vs IDEAL BAR CHART ────────────────────────── */}
-          <View style={[styles.section, shadows.sm]}>
-            <NutrientBarChart nutrientStatus={advisory.nutrient_status || {}} />
-          </View>
+          {/* ── SCORE DEDUCTIONS ACCORDION CARD ────────────────────── */}
+          {advisory.score_deductions?.length > 0 && (
+            <TouchableOpacity 
+              style={[
+                styles.deductionsCard, 
+                shadows.sm,
+                deductionsExpanded && { paddingBottom: spacing.lg }
+              ]}
+              onPress={() => setDeductionsExpanded(!deductionsExpanded)}
+              activeOpacity={0.92}
+            >
+              <View style={styles.deductionsHeaderRow}>
+                <Text style={styles.deductionsTitle}>
+                  {isHindi 
+                    ? `📉 स्वास्थ्य स्कोर ${score}/100 क्यों है?` 
+                    : `📉 Why your score is ${score}/100`}
+                </Text>
+                <Text style={styles.deductionsArrow}>
+                  {deductionsExpanded 
+                    ? (isHindi ? '▲ बंद करें' : '▲ Collapse') 
+                    : (isHindi ? '▼ विवरण देखें' : '▼ View Details')}
+                </Text>
+              </View>
+
+              {deductionsExpanded && (
+                <View style={styles.deductionsExpandedList}>
+                  <View style={styles.deductionsDivider} />
+                  {advisory.score_deductions.map((d, idx) => (
+                    <View key={idx} style={styles.deductionItemRow}>
+                      <View style={styles.deductionBullet}>
+                        <Text style={styles.deductionBulletText}>⚠️</Text>
+                      </View>
+                      <View style={styles.deductionTextCol}>
+                        <Text style={styles.deductionFactorText}>{d.factor}</Text>
+                        <Text style={styles.deductionIssueText}>{d.issue}</Text>
+                      </View>
+                      <View style={styles.penaltyBadge}>
+                        <Text style={styles.penaltyBadgeText}>-{d.penalty} pts</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* ── NUTRIENT STATUS ─────────────────────────────────────── */}
           <View style={[styles.section, shadows.sm]}>
@@ -601,62 +795,109 @@ export default function AdvisoryResultScreen({ navigation, route }) {
           </View>
 
 
-          {/* ── FERTILIZER RECOMMENDATIONS ──────────────────────────── */}
+          {/* ── SMART FERTILIZER & COST PLAN ────────────────────────── */}
           {recs.length > 0 ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🧪 {t('advisory.section_recommendations')}</Text>
-              <Text style={styles.sectionSub}>
-                {farmSizeNum} {t('soil_input.farm_size_unit')} · {t('advisory.per_acre')}
-              </Text>
-              {recs.map((rec, i) => (
-                <FertilizerCard
-                  key={i}
-                  rec={rec}
-                  index={i}
-                />
-              ))}
+            <View style={styles.planContainer}>
+              <View style={styles.planHeader}>
+                <View style={styles.planTitleRow}>
+                  <Text style={styles.planTitle}>🌾 {isHindi ? 'उर्वरक एवं लागत योजना' : 'Fertilizer & Cost Plan'}</Text>
+                  
+                  {/* Organic Toggle Pill */}
+                  <TouchableOpacity 
+                    onPress={() => setOrganicMode(!organicMode)}
+                    style={[styles.organicToggleBtn, organicMode && styles.organicToggleBtnActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.organicToggleText, organicMode && styles.organicToggleTextActive]}>
+                      🌿 {isHindi ? 'जैविक' : 'Organic'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Farm Size Live Calculator Stepper Panel */}
+                <View style={styles.stepperContainer}>
+                  <Text style={styles.stepperLabel}>
+                    {isHindi ? '📊 खेत का आकार:' : '📊 Farm Size:'}
+                  </Text>
+                  <View style={styles.stepperActions}>
+                    <TouchableOpacity
+                      onPress={() => setLiveFarmSize(prev => Math.max(0.5, prev - 0.5))}
+                      style={styles.stepperBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.stepperBtnText}>−</Text>
+                    </TouchableOpacity>
+                    <View style={styles.stepperValueContainer}>
+                      <Text style={styles.stepperValue}>{liveFarmSize}</Text>
+                      <Text style={styles.stepperUnit}>{isHindi ? 'एकड़' : 'acres'}</Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setLiveFarmSize(prev => Math.min(50, prev + 0.5))}
+                      style={styles.stepperBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.stepperBtnText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              {/* Fertilizer Recommendation Cards */}
+              <View style={styles.planList}>
+                {recs.map((rec, i) => (
+                  <FertilizerCard
+                    key={i}
+                    rec={rec}
+                    index={i}
+                    scaleMultiplier={liveFarmSize / farmSizeNum}
+                    organicMode={organicMode}
+                  />
+                ))}
+              </View>
+
+              {/* Budget priority tip */}
+              {advisory.budget_tip && (
+                <View style={styles.budgetTipCard}>
+                  <Text style={styles.budgetTipIcon}>💡</Text>
+                  <View style={styles.budgetTipText}>
+                    <Text style={styles.budgetTipTitle}>{t('advisory.section_budget_tip')}</Text>
+                    <Text style={styles.budgetTipBody}>{advisory.budget_tip}</Text>
+                    
+                    {/* Agricultural savings bullets */}
+                    <View style={styles.budgetBulletList}>
+                      <Text style={styles.budgetBullet}>
+                        • {isHindi 
+                          ? 'सहकारी खरीद: यूरिया/डीएपी को नजदीकी सहकारी समितियों से थोक में (50kg बैग) खरीदने से परिवहन लागत में 10% की अतिरिक्त बचत होगी।' 
+                          : 'Cooperative Benefit: Buying Urea/DAP in bulk (50kg bags) from local co-ops saves up to 10% on transport.'}
+                      </Text>
+                      <Text style={styles.budgetBullet}>
+                        • {isHindi 
+                          ? 'सरकारी सब्सिडी: पीएम-किसान योजना के तहत स्थानीय उर्वरक केंद्रों पर सब्सिडी दरों की उपलब्धता की जांच करना सुनिश्चित करें।' 
+                          : 'Subsidy Alert: Verify subsidized rates under PM-KISAN at licensed centers for direct reimbursement benefit.'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Invoice styled Total Cost Banner */}
+              <View style={styles.totalCostCard}>
+                <View style={styles.totalCostLeft}>
+                  <Text style={styles.totalCostLabel}>{t('advisory.total_cost')}</Text>
+                  <Text style={styles.totalCostSub}>
+                    {liveFarmSize} {t('soil_input.farm_size_unit')} {isHindi ? 'के लिए कुल' : 'total estimation'}
+                  </Text>
+                </View>
+                <Text style={styles.totalCostValue}>
+                  ₹{Math.round((advisory.total_cost_inr || 0) * (liveFarmSize / farmSizeNum)).toLocaleString('en-IN')}
+                </Text>
+              </View>
             </View>
           ) : (
             <View style={[styles.section, styles.goodSoilCard]}>
               <Text style={styles.goodSoilEmoji}>🎉</Text>
               <Text style={styles.goodSoilTitle}>{t('advisory.no_recommendations')}</Text>
               <Text style={styles.goodSoilSub}>{t('advisory.score_excellent')} — {t('advisory.score_label')}</Text>
-            </View>
-          )}
-
-          {/* ── BUDGET PRIORITY TIP ─────────────────────────────────── */}
-          {advisory.budget_tip && recs.length > 0 && (
-            <View style={styles.budgetTipCard}>
-              <Text style={styles.budgetTipIcon}>💰</Text>
-              <View style={styles.budgetTipText}>
-                <Text style={styles.budgetTipTitle}>{t('advisory.section_budget_tip')}</Text>
-                <Text style={styles.budgetTipBody}>{advisory.budget_tip}</Text>
-              </View>
-            </View>
-          )}
-
-          {/* ── TOTAL COST BANNER ───────────────────────────────────── */}
-          <View style={[styles.totalCostCard, { borderColor: scoreColor }]}>
-            <View style={styles.totalCostLeft}>
-              <Text style={styles.totalCostLabel}>{t('advisory.total_cost')}</Text>
-              <Text style={styles.totalCostSub}>
-                {farmSizeNum} {t('soil_input.farm_size_unit')}
-              </Text>
-            </View>
-            <Text style={[styles.totalCostValue, { color: scoreColor }]}>
-              ₹{(advisory.total_cost_inr || 0).toLocaleString('en-IN')}
-            </Text>
-          </View>
-
-          {/* ── SCORE DEDUCTIONS (viva detail) ──────────────────────── */}
-          {advisory.score_deductions?.length > 0 && (
-            <View style={styles.deductionsCard}>
-              <Text style={styles.deductionsTitle}>📉 Why your score is {score}/100</Text>
-              {advisory.score_deductions.map((d, i) => (
-                <Text key={i} style={styles.deductionItem}>
-                  • {d.factor}: {d.issue} (-{d.penalty} pts)
-                </Text>
-              ))}
             </View>
           )}
 
@@ -722,13 +963,14 @@ const styles = StyleSheet.create({
   },
   errorBtnText: { color: '#fff', fontWeight: fontWeights.bold },
 
-  // Header (color changes based on score)
+  // Premium Forest Green Header
   header: {
+    backgroundColor: '#1B4D3E', // Sleek forest green theme
     paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl + spacing.xl,
+    paddingBottom: spacing.xxl + spacing.lg,
     paddingHorizontal: spacing.lg,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
     overflow: 'hidden',
   },
   headerBubble: {
@@ -738,13 +980,20 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  backBtn: { marginBottom: spacing.md },
+  backBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: spacing.md,
+  },
   backText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
+    color: '#FFFFFF',
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.bold,
   },
   headerContent: {
     flexDirection: 'row',
@@ -754,30 +1003,30 @@ const styles = StyleSheet.create({
 
   // Score ring
   scoreRingOuter: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    borderWidth: 5,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   scoreRingInner: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scoreNum: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: fontWeights.extrabold,
-    color: '#fff',
-    lineHeight: 36,
+    color: '#FFFFFF', // Clean readable white
+    lineHeight: 34,
   },
   scoreOutOf: {
     fontSize: fontSizes.xs,
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(255,255,255,0.7)',
     fontWeight: fontWeights.semibold,
   },
 
@@ -785,23 +1034,23 @@ const styles = StyleSheet.create({
   scoreMeta: { flex: 1, gap: spacing.sm },
   scoreLabelBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   scoreLabelText: {
-    color: '#fff',
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.bold,
+    fontSize: fontSizes.xs + 1,
+    fontWeight: fontWeights.extrabold,
   },
   cropLine: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
+    fontWeight: fontWeights.semibold,
   },
   scanIdLine: {
     color: 'rgba(255,255,255,0.55)',
     fontSize: fontSizes.xs,
+    fontWeight: fontWeights.medium,
   },
 
   // Body
@@ -993,92 +1242,335 @@ const styles = StyleSheet.create({
     color: '#7A6030',
     lineHeight: 20,
   },
+  budgetBulletList: {
+    marginTop: spacing.sm,
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#FFEBD0',
+    paddingTop: spacing.sm,
+  },
+  budgetBullet: {
+    fontSize: fontSizes.xs + 1,
+    color: '#8A6020',
+    lineHeight: 18,
+    fontWeight: fontWeights.semibold,
+  },
 
   // Total cost
   totalCostCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.xl,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderLeftWidth: 4,
+    borderLeftColor: '#16A34A', // Money green border
     ...shadows.sm,
   },
   totalCostLeft: { gap: 2 },
   totalCostLabel: {
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.sm,
     fontWeight: fontWeights.bold,
-    color: colors.textPrimary,
+    color: '#475569',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   totalCostSub: {
-    fontSize: fontSizes.sm,
-    color: colors.textSecondary,
+    fontSize: fontSizes.xs,
+    color: '#64748B',
+    fontWeight: fontWeights.semibold,
   },
   totalCostValue: {
-    fontSize: fontSizes.xxxl,
+    fontSize: 28,
     fontWeight: fontWeights.extrabold,
+    color: '#15803D', // Beautiful rich Money green
   },
 
-  // Score deductions
-  deductionsCard: {
-    backgroundColor: '#FFF0F0',
+  // Smart Plan Group Container
+  planContainer: {
     borderRadius: radius.lg,
     padding: spacing.lg,
+    gap: spacing.lg,
+    borderWidth: 1.5,
+    borderColor: '#EAF7EF',
+    backgroundColor: '#F6FCF8',
+  },
+  planHeader: {
+    gap: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingBottom: spacing.md,
+  },
+  planTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  planTitle: {
+    fontSize: fontSizes.lg - 2,
+    fontWeight: fontWeights.extrabold,
+    color: colors.primaryDark,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  
+  // Organic Toggle Switch Pill
+  organicToggleBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.2,
+    borderColor: '#D8F3DC',
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+    ...shadows.sm,
+  },
+  organicToggleBtnActive: {
+    backgroundColor: '#D8F3DC',
+    borderColor: '#52B788',
+  },
+  organicToggleText: {
+    fontSize: fontSizes.xs + 1,
+    fontWeight: fontWeights.bold,
+    color: '#52B788',
+  },
+  organicToggleTextActive: {
+    color: '#1B4332',
+  },
+
+  // Live farm size stepper panel
+  stepperContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#EAF7EF',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+    ...shadows.sm,
+  },
+  stepperLabel: {
+    fontSize: fontSizes.xs + 1,
+    fontWeight: fontWeights.bold,
+    color: '#475569',
+  },
+  stepperActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.statusPoor,
+  },
+  stepperBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.inputBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  stepperBtnText: {
+    fontSize: 20,
+    fontWeight: fontWeights.bold,
+    color: colors.textPrimary,
+    lineHeight: 22,
+  },
+  stepperValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 2,
+    minWidth: 46,
+    justifyContent: 'center',
+  },
+  stepperValue: {
+    fontSize: fontSizes.md + 1,
+    fontWeight: fontWeights.extrabold,
+    color: colors.primaryDark,
+  },
+  stepperUnit: {
+    fontSize: 10,
+    fontWeight: fontWeights.bold,
+    color: colors.textSecondary,
+  },
+
+  // Organic alternative box inside Fertilizer Card
+  organicBox: {
+    backgroundColor: '#EBFCEF',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderLeftWidth: 3.5,
+    borderLeftColor: '#2D6A4F',
+    marginTop: spacing.xs,
+  },
+  organicText: {
+    fontSize: fontSizes.sm - 0.5,
+    color: '#1B4332',
+    lineHeight: 18,
+    fontWeight: fontWeights.semibold,
+  },
+  planList: {
+    gap: spacing.md,
+  },
+
+  // Segmented Control Tabs
+  tabHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  segmentBar: {
+    flexDirection: 'row',
+    backgroundColor: colors.inputBackground,
+    borderRadius: radius.md,
+    padding: 3,
+    gap: 4,
+    marginTop: 2,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+  },
+  segmentBtnActive: {
+    backgroundColor: colors.surface,
+    ...shadows.sm,
+  },
+  segmentBtnText: {
+    fontSize: fontSizes.xs + 1,
+    fontWeight: fontWeights.bold,
+    color: colors.textSecondary,
+  },
+  segmentBtnTextActive: {
+    color: colors.primaryDark,
+  },
+
+  // Score Deductions Accordion Card
+  deductionsCard: {
+    backgroundColor: '#FFF5F5', // Soft crimson red background
+    borderRadius: 16,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: '#FFE3E3',
+    borderLeftWidth: 5,
+    borderLeftColor: '#EF4444', // Crimson left border
+  },
+  deductionsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   deductionsTitle: {
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.sm + 1,
     fontWeight: fontWeights.bold,
-    color: colors.statusPoor,
-    marginBottom: spacing.xs,
+    color: '#991B1B', // Rich dark readable red
   },
-  deductionItem: {
+  deductionsArrow: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.extrabold,
+    color: '#B91C1C',
+  },
+  deductionsExpandedList: {
+    marginTop: spacing.md,
+    gap: spacing.md,
+  },
+  deductionsDivider: {
+    height: 1,
+    backgroundColor: '#FEE2E2',
+  },
+  deductionItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  deductionBullet: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deductionBulletText: {
+    fontSize: 13,
+  },
+  deductionTextCol: {
+    flex: 1,
+    gap: 1,
+  },
+  deductionFactorText: {
     fontSize: fontSizes.sm,
-    color: '#8B1A1A',
-    lineHeight: 20,
+    fontWeight: fontWeights.bold,
+    color: '#7F1D1D',
+  },
+  deductionIssueText: {
+    fontSize: fontSizes.xs,
+    color: '#991B1B',
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
+  },
+  penaltyBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.22)',
+    borderRadius: radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  penaltyBadgeText: {
+    fontSize: 10,
+    fontWeight: fontWeights.extrabold,
+    color: '#DC2626',
   },
 
   // Action buttons
   actionBtns: { gap: spacing.md },
   calendarBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.lg,
+    backgroundColor: '#1F6E43', // Forest green
+    borderRadius: 16,
     padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     ...shadows.md,
   },
-  calendarBtnEmoji: { fontSize: 28 },
+  calendarBtnEmoji: { fontSize: 24 },
   calendarBtnTitle: {
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.md,
     fontWeight: fontWeights.bold,
-    color: '#fff',
+    color: '#FFFFFF',
   },
   calendarBtnSub: {
     fontSize: fontSizes.xs,
     color: 'rgba(255,255,255,0.7)',
+    fontWeight: fontWeights.medium,
   },
   calendarBtnArrow: {
-    fontSize: fontSizes.xxl,
-    color: '#fff',
+    fontSize: fontSizes.lg,
+    color: '#FFFFFF',
     fontWeight: fontWeights.bold,
     marginLeft: 'auto',
   },
   scanAgainBtn: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
     paddingVertical: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   scanAgainText: {
-    fontSize: fontSizes.md,
-    color: colors.textSecondary,
-    fontWeight: fontWeights.semibold,
+    fontSize: fontSizes.sm,
+    color: '#475569',
+    fontWeight: fontWeights.bold,
   },
 
   // TTS Read Aloud button
@@ -1086,14 +1578,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.md + 4,
     paddingVertical: spacing.sm,
     marginTop: spacing.md,
     gap: spacing.sm,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: 'rgba(255,255,255,0.22)',
   },
   ttsBtnActive: {
     backgroundColor: 'rgba(220,53,69,0.85)',

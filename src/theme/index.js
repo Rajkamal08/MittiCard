@@ -7,13 +7,15 @@ export const spacing = {
   lg: 24,
   xl: 32,
   xxl: 48,
+  xxxl: 64,
 };
 
 export const radius = {
   sm: 8,
   md: 12,
-  lg: 20,
-  xl: 28,
+  lg: 16,
+  xl: 24,
+  xxl: 28,
   full: 999,
 };
 
@@ -25,6 +27,7 @@ export const fontSizes = {
   xl: 20,
   xxl: 26,
   xxxl: 34,
+  hero: 42,
 };
 
 export const fontWeights = {
@@ -37,24 +40,31 @@ export const fontWeights = {
 
 export const shadows = {
   sm: {
-    shadowColor: '#2D6A4F',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.07,
-    shadowRadius: 4,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 2,
   },
   md: {
-    shadowColor: '#2D6A4F',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
     elevation: 4,
   },
   lg: {
-    shadowColor: '#1B4332',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    elevation: 7,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 30,
+    elevation: 8,
+  },
+  glow: {
+    shadowColor: '#1F6E43',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
   },
 };

@@ -73,6 +73,9 @@ export const submitSoilData = data =>
 export const getAdvisory = scanId =>
   api.get(`/advisory/${scanId}`);
 
+export const updateSowingDate = (scanId, sowingDate) =>
+  api.put(`/advisory/${scanId}/sowing-date`, { sowing_date: sowingDate });
+
 // OCR: send base64 image → get extracted soil values back
 // Uses ocrApi (120s timeout) — Tesseract downloads 30MB language data on first run
 export const scanImageForOCR = (image_base64) =>

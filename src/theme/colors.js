@@ -1,55 +1,60 @@
-// MittiCard — Soil Health Advisory App
-// Color Palette: earthy greens, warm neutrals, deep soil tones
+// MittiCard — Modern Agri-Tech Design System
+// Premium, clean, fintech-inspired color palette
 
 const colors = {
-  // Primary — deep forest green
-  primary: '#2D6A4F',
-  primaryLight: '#40916C',
-  primaryDark: '#1B4332',
+  // Primary — deep agricultural green
+  primary: '#1F6E43',
+  primaryLight: '#3FA169',
+  primaryDark: '#165A36',
 
   // Accent — golden harvest
-  accent: '#F4A261',
-  accentLight: '#FFBA6B',
-  accentDark: '#E76F51',
+  accent: '#F4B400',
+  accentLight: '#FFD54F',
+  accentDark: '#E09800',
 
   // Backgrounds
-  background: '#F8F5F0',     // warm off-white (like soil paper)
+  background: '#F6F8F7',       // cool clean white-green
+  backgroundGradientEnd: '#EEF7F1',
   surface: '#FFFFFF',
-  surfaceElevated: '#FDFAF6',
+  surfaceElevated: '#FFFFFF',
 
   // Text
-  textPrimary: '#1A1A2E',
-  textSecondary: '#52526B',
-  textMuted: '#9B9BB0',
+  textPrimary: '#0F172A',
+  textSecondary: '#64748B',
+  textMuted: '#94A3B8',
   textOnPrimary: '#FFFFFF',
-  textOnAccent: '#1A1A2E',
+  textOnAccent: '#0F172A',
 
   // Soil Health Status colors
-  statusGood: '#52B788',      // healthy green
-  statusWarning: '#F4A261',   // caution amber
-  statusPoor: '#E63946',      // deficient red
-  statusFair: '#FFBA08',      // fair yellow
+  statusGood: '#22C55E',       // success green
+  statusWarning: '#F59E0B',    // warning amber
+  statusPoor: '#EF4444',       // error red
+  statusFair: '#F59E0B',
 
   // Utility
-  border: '#E8E4DE',
-  borderFocus: '#2D6A4F',
-  inputBackground: '#F4F1EC',
-  placeholder: '#B0ADA8',
+  border: '#E2E8F0',
+  borderFocus: '#1F6E43',
+  inputBackground: '#F1F5F9',
+  placeholder: '#94A3B8',
 
   // OTP Box
-  otpBorder: '#D0CCC5',
-  otpBorderActive: '#2D6A4F',
-  otpBackground: '#FAFAFA',
+  otpBorder: '#E2E8F0',
+  otpBorderActive: '#1F6E43',
+  otpBackground: '#F8FAFC',
 
   // Score gradient stops
-  scoreLow: '#E63946',
-  scoreMid: '#FFBA08',
-  scoreHigh: '#52B788',
+  scoreLow: '#EF4444',
+  scoreMid: '#F59E0B',
+  scoreHigh: '#22C55E',
 
   // Shadows / Overlay
-  shadow: 'rgba(45, 106, 79, 0.12)',
-  overlay: 'rgba(0, 0, 0, 0.45)',
-  shimmer: '#F0EDE8',
+  shadow: 'rgba(15, 23, 42, 0.08)',
+  overlay: 'rgba(0, 0, 0, 0.5)',
+  shimmer: '#F1F5F9',
+
+  // Gradient helpers
+  gradientStart: '#1F6E43',
+  gradientEnd: '#3FA169',
 };
 
 export default colors;

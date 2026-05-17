@@ -23,6 +23,7 @@
     "react-native": "0.84.1",
     "react-native-gesture-handler": "^2.30.1",
     "react-native-image-picker": "^8.2.1",
+    "react-native-linear-gradient": "^2.8.3",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
     "react-native-tts": "^4.1.1",

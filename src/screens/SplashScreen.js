@@ -7,6 +7,7 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { colors, spacing, fontSizes, fontWeights } from '../theme';
 import { getToken, getUser } from '../services/storage';
 import { setAuthToken } from '../services/api';
@@ -14,27 +15,70 @@ import { setAuthToken } from '../services/api';
 const { width, height } = Dimensions.get('window');
 
 export default function SplashScreen({ navigation }) {
-  const fadeAnim   = useRef(new Animated.Value(0)).current;
-  const scaleAnim  = useRef(new Animated.Value(0.7)).current;
-  const slideAnim  = useRef(new Animated.Value(30)).current;
+  const logoScale   = useRef(new Animated.Value(0.5)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const textSlide   = useRef(new Animated.Value(30)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const ringScale   = useRef(new Animated.Value(0)).current;
+  const ringOpacity = useRef(new Animated.Value(0.6)).current;
+  const bottomFade  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animate logo in
+    // Step 1: Logo appears with spring
     Animated.parallel([
-      Animated.timing(fadeAnim, {
+      Animated.spring(logoScale, {
         toValue: 1,
-        duration: 800,
+        tension: 50,
+        friction: 7,
         useNativeDriver: true,
       }),
-      Animated.spring(scaleAnim, {
+      Animated.timing(logoOpacity, {
         toValue: 1,
-        tension: 60,
-        friction: 8,
+        duration: 600,
         useNativeDriver: true,
       }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 700,
+    ]).start();
+
+    // Step 2: Ring pulse animation
+    Animated.sequence([
+      Animated.delay(300),
+      Animated.parallel([
+        Animated.timing(ringScale, {
+          toValue: 2.5,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(ringOpacity, {
+          toValue: 0,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    // Step 3: Text slides up
+    Animated.sequence([
+      Animated.delay(400),
+      Animated.parallel([
+        Animated.timing(textSlide, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(textOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    // Step 4: Bottom text fades in
+    Animated.sequence([
+      Animated.delay(900),
+      Animated.timing(bottomFade, {
+        toValue: 1,
+        duration: 500,
         useNativeDriver: true,
       }),
     ]).start();
@@ -63,58 +107,66 @@ export default function SplashScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} translucent />
 
-      {/* Background circles for depth */}
-      <View style={styles.circleTop} />
-      <View style={styles.circleBottom} />
+      <LinearGradient
+        colors={[colors.primaryDark, colors.primary, colors.primaryLight]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
 
-      {/* Logo & Brand */}
+      {/* Decorative floating circles */}
+      <View style={styles.circle1} />
+      <View style={styles.circle2} />
+      <View style={styles.circle3} />
+
+      {/* Pulse ring behind logo */}
+      <Animated.View
+        style={[
+          styles.pulseRing,
+          {
+            opacity: ringOpacity,
+            transform: [{ scale: ringScale }],
+          },
+        ]}
+      />
+
+      {/* Logo */}
       <Animated.View
         style={[
           styles.logoContainer,
           {
-            opacity: fadeAnim,
-            transform: [{ scale: scaleAnim }],
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }],
           },
         ]}
       >
-        {/* App Icon — leaf + soil wave */}
-        <View style={styles.iconWrapper}>
-          <Text style={styles.iconEmoji}>🌱</Text>
+        <View style={styles.logoBox}>
+          <Text style={styles.logoEmoji}>🌱</Text>
         </View>
-
-        <Animated.Text
-          style={[
-            styles.appName,
-            { transform: [{ translateY: slideAnim }], opacity: fadeAnim },
-          ]}
-        >
-          MittiCard
-        </Animated.Text>
-
-        <Animated.Text
-          style={[
-            styles.tagline,
-            { transform: [{ translateY: slideAnim }], opacity: fadeAnim },
-          ]}
-        >
-          मिट्टी की सेहत, फसल का भविष्य
-        </Animated.Text>
-        <Animated.Text
-          style={[
-            styles.taglineEn,
-            { transform: [{ translateY: slideAnim }], opacity: fadeAnim },
-          ]}
-        >
-          Soil Health · Crop Advisory
-        </Animated.Text>
       </Animated.View>
 
-      {/* Bottom tagline */}
-      <Animated.Text style={[styles.bottomText, { opacity: fadeAnim }]}>
-        Powered by AI Rule Engine
-      </Animated.Text>
+      {/* Brand Text */}
+      <Animated.View
+        style={{
+          opacity: textOpacity,
+          transform: [{ translateY: textSlide }],
+          alignItems: 'center',
+        }}
+      >
+        <Text style={styles.appName}>MittiCard</Text>
+        <Text style={styles.taglineHi}>मिट्टी की सेहत, फसल का भविष्य</Text>
+        <View style={styles.dividerLine} />
+        <Text style={styles.taglineEn}>Smart Soil Intelligence for Farmers</Text>
+      </Animated.View>
+
+      {/* Bottom text */}
+      <Animated.View style={[styles.bottomSection, { opacity: bottomFade }]}>
+        <View style={styles.aiPill}>
+          <Text style={styles.aiPillText}>✨ Powered by AI</Text>
+        </View>
+      </Animated.View>
     </View>
   );
 }
@@ -122,73 +174,115 @@ export default function SplashScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  circleTop: {
+
+  // Decorative circles
+  circle1: {
     position: 'absolute',
-    top: -80,
-    right: -80,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: colors.primaryLight,
-    opacity: 0.35,
+    top: -height * 0.12,
+    right: -width * 0.2,
+    width: width * 0.7,
+    height: width * 0.7,
+    borderRadius: width * 0.35,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  circleBottom: {
+  circle2: {
     position: 'absolute',
-    bottom: -100,
-    left: -60,
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: colors.primaryDark,
-    opacity: 0.5,
+    bottom: -height * 0.08,
+    left: -width * 0.15,
+    width: width * 0.5,
+    height: width * 0.5,
+    borderRadius: width * 0.25,
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  logoContainer: {
-    alignItems: 'center',
+  circle3: {
+    position: 'absolute',
+    top: height * 0.3,
+    left: -width * 0.1,
+    width: width * 0.3,
+    height: width * 0.3,
+    borderRadius: width * 0.15,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  iconWrapper: {
-    width: 110,
-    height: 110,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-    borderWidth: 2,
+
+  // Pulse ring
+  pulseRing: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.3)',
   },
-  iconEmoji: {
+
+  // Logo
+  logoContainer: {
+    marginBottom: spacing.xl,
+  },
+  logoBox: {
+    width: 110,
+    height: 110,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  logoEmoji: {
     fontSize: 56,
   },
+
+  // Brand text
   appName: {
-    fontSize: 42,
+    fontSize: 44,
     fontWeight: fontWeights.extrabold,
-    color: colors.textOnPrimary,
-    letterSpacing: 1.5,
+    color: '#FFFFFF',
+    letterSpacing: 2,
     marginBottom: spacing.sm,
   },
-  tagline: {
+  taglineHi: {
     fontSize: fontSizes.lg,
-    color: 'rgba(255,255,255,0.85)',
+    color: 'rgba(255,255,255,0.9)',
     fontWeight: fontWeights.medium,
-    marginBottom: 4,
     letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+  },
+  dividerLine: {
+    width: 40,
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 1,
+    marginBottom: spacing.sm,
   },
   taglineEn: {
     fontSize: fontSizes.sm,
     color: 'rgba(255,255,255,0.6)',
     fontWeight: fontWeights.regular,
-    letterSpacing: 1.2,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
-  bottomText: {
+
+  // Bottom section
+  bottomSection: {
     position: 'absolute',
-    bottom: spacing.xxl,
+    bottom: spacing.xxl + 10,
+    alignItems: 'center',
+  },
+  aiPill: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  aiPillText: {
     fontSize: fontSizes.xs,
-    color: 'rgba(255,255,255,0.45)',
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: fontWeights.semibold,
     letterSpacing: 1,
   },
 });

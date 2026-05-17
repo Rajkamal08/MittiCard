@@ -38,7 +38,7 @@ const STEP_CONFIRM = 'confirm';
 const STEP_SUBMIT  = 'submit';
 
 // ─── Editable field row ───────────────────────────────────────────────────────
-function EditableField({ label, value, onChangeText, unit, confidence }) {
+function EditableField({ label, value, onChangeText, unit }) {
   const [focused, setFocused] = useState(false);
   const hasValue = value !== null && value !== '' && value !== undefined;
 
@@ -48,11 +48,11 @@ function EditableField({ label, value, onChangeText, unit, confidence }) {
         <Text style={styles.editFieldLabel}>{label}</Text>
         {hasValue ? (
           <View style={styles.detectedBadge}>
-            <Text style={styles.detectedText}>{t('ocr.detected')}</Text>
+            <Text style={styles.detectedText}>Detected ✓</Text>
           </View>
         ) : (
           <View style={styles.missingBadge}>
-            <Text style={styles.missingText}>{t('ocr.not_found')}</Text>
+            <Text style={styles.missingText}>Not found</Text>
           </View>
         )}
       </View>
@@ -257,30 +257,24 @@ export default function OCRScreen({ navigation }) {
 
       {/* HEADER */}
       <View style={styles.header}>
-        <View style={styles.headerBubble} />
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>📷 Scan Soil Card</Text>
-        <Text style={styles.headerSub}>
-          Take a photo of your Soil Health Card
-        </Text>
-
-        {/* Step indicator */}
-        <View style={styles.stepsRow}>
-          {[STEP_CAPTURE, STEP_SCAN, STEP_CONFIRM].map((s, i) => (
-            <View
-              key={s}
-              style={[
-                styles.stepDot,
-                step === s && styles.stepDotActive,
-                (step === STEP_CONFIRM && i < 2) ||
-                (step === STEP_SCAN    && i < 1)
-                  ? styles.stepDotDone : null,
-              ]}
-            />
-          ))}
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Scan Soil Card</Text>
+          <View style={styles.stepBadge}>
+            <Text style={styles.stepBadgeText}>
+              {step === STEP_CAPTURE ? '1/3' : step === STEP_SCAN ? '2/3' : '3/3'}
+            </Text>
+          </View>
         </View>
+        <Text style={styles.headerSub}>
+          {step === STEP_CAPTURE 
+            ? 'Take a photo of your Soil Health Card to start' 
+            : step === STEP_SCAN 
+              ? 'Review the photo before reading values' 
+              : 'Confirm the extracted values below'}
+        </Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
@@ -511,92 +505,129 @@ export default function OCRScreen({ navigation }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: {
+    flex: 1,
+    backgroundColor: '#F4F7F5', // Off-white mint background
+  },
 
+  // Premium Forest Green Header
   header: {
-    backgroundColor: colors.primary,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl + spacing.lg,
+    backgroundColor: '#1B4D3E', // Slate Forest Green
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    overflow: 'hidden',
-    gap: spacing.xs,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
-  headerBubble: {
-    position: 'absolute',
-    top: -50, right: -40,
-    width: 160, height: 160,
-    borderRadius: 80,
-    backgroundColor: colors.primaryLight,
-    opacity: 0.3,
-  },
-  backBtn:   { marginBottom: spacing.xs },
-  backText:  { color: 'rgba(255,255,255,0.8)', fontSize: fontSizes.md, fontWeight: fontWeights.medium },
-  headerTitle: { fontSize: fontSizes.xxl, fontWeight: fontWeights.extrabold, color: '#fff' },
-  headerSub:   { fontSize: fontSizes.sm, color: 'rgba(255,255,255,0.7)' },
-
-  stepsRow: {
+  headerTopRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
   },
-  stepDot: {
-    width: 8, height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  stepDotActive: { backgroundColor: '#fff', width: 24 },
-  stepDotDone:   { backgroundColor: 'rgba(255,255,255,0.7)' },
+  backBtnText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: fontWeights.extrabold,
+  },
+  stepBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  stepBadgeText: {
+    fontSize: 10,
+    color: '#15803D',
+    fontWeight: fontWeights.extrabold,
+  },
+  headerSub: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    marginTop: 2,
+  },
 
-  scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  stepSection: { marginTop: spacing.md, gap: spacing.md },
+  scroll: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  stepSection: {
+    gap: spacing.md,
+  },
 
   stepTitle: {
-    fontSize: fontSizes.xl,
+    fontSize: fontSizes.md,
     fontWeight: fontWeights.bold,
-    color: colors.textPrimary,
-    marginTop: spacing.sm,
+    color: '#334155',
+    marginTop: spacing.xs,
   },
   stepSub: {
-    fontSize: fontSizes.sm,
-    color: colors.textSecondary,
-    lineHeight: 20,
+    fontSize: fontSizes.xs,
+    color: '#64748B',
+    lineHeight: 18,
   },
 
   // Camera illustration
   cameraIllustration: {
-    backgroundColor: '#F0FAF4',
-    borderRadius: radius.lg,
-    borderWidth: 2,
-    borderColor: colors.border,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#16A34A50',
     borderStyle: 'dashed',
-    height: 160,
+    height: 140,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
+    marginBottom: spacing.md,
   },
-  cameraEmoji: { fontSize: 48 },
-  cameraIllustrationText: { fontSize: fontSizes.md, color: colors.textSecondary },
+  cameraEmoji: {
+    fontSize: 42,
+  },
+  cameraIllustrationText: {
+    fontSize: fontSizes.sm,
+    color: '#166534',
+    fontWeight: fontWeights.semibold,
+  },
 
   // Image preview
   imagePreview: {
     width: '100%',
     height: 220,
-    borderRadius: radius.lg,
-    backgroundColor: '#000',
+    borderRadius: 16,
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
 
   // Scanning state
   scanningState: {
     alignItems: 'center',
-    paddingVertical: spacing.xxl,
+    paddingVertical: spacing.xl,
     gap: spacing.md,
   },
-  scanningTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: colors.textPrimary },
+  scanningTitle: {
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.bold,
+    color: '#1E293B',
+  },
   scanningSub: {
-    fontSize: fontSizes.sm, color: colors.textSecondary,
-    textAlign: 'center', lineHeight: 22,
+    fontSize: fontSizes.xs,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 
   // Submitting state
@@ -605,146 +636,277 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
     gap: spacing.md,
   },
-  submittingText: { fontSize: fontSizes.md, color: colors.textSecondary },
+  submittingText: {
+    fontSize: fontSizes.sm,
+    color: '#64748B',
+    fontWeight: fontWeights.semibold,
+  },
 
   // Buttons
   primaryBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.lg,
+    backgroundColor: '#1F6E43', // MittiCard brand primary green
+    borderRadius: 16,
     padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     ...shadows.md,
   },
-  primaryBtnEmoji: { fontSize: 28 },
+  primaryBtnEmoji: {
+    fontSize: 24,
+  },
   primaryBtnText: {
-    fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: '#fff',
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.bold,
+    color: '#FFFFFF',
   },
   primaryBtnSub: {
-    fontSize: fontSizes.xs, color: 'rgba(255,255,255,0.7)', marginTop: 2,
+    fontSize: fontSizes.xs,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 2,
   },
   secondaryBtn: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
   },
-  secondaryBtnEmoji: { fontSize: 20 },
-  secondaryBtnText: {
-    fontSize: fontSizes.md, color: colors.textSecondary, fontWeight: fontWeights.semibold,
+  secondaryBtnEmoji: {
+    fontSize: 18,
   },
-  manualBtn:     { alignItems: 'center', paddingVertical: spacing.sm },
-  manualBtnText: { fontSize: fontSizes.sm, color: colors.primary, fontWeight: fontWeights.medium },
+  secondaryBtnText: {
+    fontSize: fontSizes.sm,
+    color: '#475569',
+    fontWeight: fontWeights.bold,
+  },
+  manualBtn: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  manualBtnText: {
+    fontSize: fontSizes.xs,
+    color: '#1F6E43',
+    fontWeight: fontWeights.bold,
+  },
 
   submitBtn: {
-    backgroundColor: colors.primary, borderRadius: radius.lg,
+    backgroundColor: '#1F6E43',
+    borderRadius: 16,
     paddingVertical: spacing.lg,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.sm, ...shadows.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    ...shadows.md,
   },
-  submitBtnText:  { fontSize: fontSizes.xl, fontWeight: fontWeights.bold, color: '#fff' },
-  submitBtnEmoji: { fontSize: 22 },
+  submitBtnText: {
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.bold,
+    color: '#FFFFFF',
+  },
+  submitBtnEmoji: {
+    fontSize: 20,
+  },
 
-  // Tips
+  // Tips Card
   tipsCard: {
-    backgroundColor: '#F0FAF4', borderRadius: radius.lg,
-    padding: spacing.lg, gap: spacing.sm,
-    borderLeftWidth: 3, borderLeftColor: colors.primary,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 16,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    borderLeftWidth: 4,
+    borderLeftColor: '#16A34A',
   },
-  tipsTitle: { fontSize: fontSizes.md, fontWeight: fontWeights.bold, color: colors.primaryDark },
-  tipItem:   { fontSize: fontSizes.sm, color: colors.textSecondary, lineHeight: 22 },
+  tipsTitle: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.bold,
+    color: '#166534',
+  },
+  tipItem: {
+    fontSize: fontSizes.xs,
+    color: '#15803D',
+    lineHeight: 18,
+  },
 
   // Confidence banner
   confidenceBanner: {
-    borderRadius: radius.lg, padding: spacing.md,
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
+    borderRadius: 16,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
   },
-  confidenceEmoji: { fontSize: 24, marginTop: 2 },
-  confidenceText:  { flex: 1, gap: 4 },
-  confidenceTitle: { fontSize: fontSizes.md, fontWeight: fontWeights.bold },
-  confidenceSub:   { fontSize: fontSizes.sm, color: colors.textSecondary, lineHeight: 20 },
+  confidenceEmoji: {
+    fontSize: 20,
+    marginTop: 2,
+  },
+  confidenceText: {
+    flex: 1,
+    gap: 2,
+  },
+  confidenceTitle: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.bold,
+  },
+  confidenceSub: {
+    fontSize: fontSizes.xs,
+    color: '#64748B',
+    lineHeight: 16,
+  },
 
-  // Card
+  // Card Container (Matches HomeScreen)
   card: {
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    padding: spacing.lg, gap: spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: spacing.lg,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: spacing.md,
   },
   cardLabel: {
-    fontSize: fontSizes.sm, fontWeight: fontWeights.bold,
-    color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5,
+    fontSize: 10,
+    fontWeight: fontWeights.bold,
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 2,
   },
 
   // Crop chips
   cropChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    borderRadius: radius.full, borderWidth: 1.5,
-    borderColor: colors.border, marginRight: spacing.sm,
-    backgroundColor: colors.inputBackground,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginRight: 8,
+    backgroundColor: '#F8FAF9',
   },
   cropChipSelected: {
-    backgroundColor: colors.primary + '18', borderColor: colors.primary,
+    backgroundColor: '#DCFCE7',
+    borderColor: '#16A34A',
   },
-  cropChipEmoji: { fontSize: 16 },
+  cropChipEmoji: {
+    fontSize: 14,
+  },
   cropChipLabel: {
-    fontSize: fontSizes.sm, color: colors.textSecondary, fontWeight: fontWeights.medium,
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: fontWeights.semibold,
   },
-  cropChipLabelSelected: { color: colors.primary, fontWeight: fontWeights.bold },
+  cropChipLabelSelected: {
+    color: '#15803D',
+    fontWeight: fontWeights.bold,
+  },
 
   // Farm size
   farmSizeRow: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginTop: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
   },
   farmSizeInput: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: colors.border,
-    borderRadius: radius.md, overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#F8FAF9',
   },
   farmSizeField: {
-    fontSize: fontSizes.md, color: colors.textPrimary,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    minWidth: 60, fontWeight: fontWeights.semibold,
+    fontSize: fontSizes.sm,
+    color: '#1E293B',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minWidth: 70,
+    fontWeight: fontWeights.bold,
   },
   farmSizeUnit: {
-    fontSize: fontSizes.sm, color: colors.textMuted,
+    fontSize: fontSizes.xs,
+    color: '#64748B',
     paddingRight: spacing.sm,
-  },
-
-  // Editable field
-  editField:       { gap: 4 },
-  editFieldHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  editFieldLabel:  { fontSize: fontSizes.sm, fontWeight: fontWeights.semibold, color: colors.textSecondary },
-  detectedBadge: {
-    backgroundColor: '#EAF7EF', borderRadius: radius.full,
-    paddingHorizontal: 8, paddingVertical: 2,
-  },
-  detectedText: { fontSize: 10, fontWeight: fontWeights.bold, color: colors.statusGood },
-  missingBadge: {
-    backgroundColor: '#FFF5E6', borderRadius: radius.full,
-    paddingHorizontal: 8, paddingVertical: 2,
-  },
-  missingText: { fontSize: 10, fontWeight: fontWeights.bold, color: colors.statusWarning },
-  editInputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: colors.border,
-    borderRadius: radius.md, backgroundColor: colors.inputBackground,
-    overflow: 'hidden',
-  },
-  editInputFocused: { borderColor: colors.borderFocus, backgroundColor: colors.surface },
-  editInputMissing: { borderColor: colors.statusWarning + '80', backgroundColor: '#FFFBF0' },
-  editInput: {
-    flex: 1, fontSize: fontSizes.md, color: colors.textPrimary,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
     fontWeight: fontWeights.semibold,
   },
+
+  // Editable field row
+  editField: {
+    gap: 6,
+    marginBottom: spacing.xs,
+  },
+  editFieldHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  editFieldLabel: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.bold,
+    color: '#475569',
+  },
+  detectedBadge: {
+    backgroundColor: '#DCFCE7',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  detectedText: {
+    fontSize: 9,
+    fontWeight: fontWeights.extrabold,
+    color: '#15803D',
+  },
+  missingBadge: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  missingText: {
+    fontSize: 9,
+    fontWeight: fontWeights.extrabold,
+    color: '#B45309',
+  },
+  editInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#F8FAF9',
+    overflow: 'hidden',
+    height: 46,
+  },
+  editInputFocused: {
+    borderColor: '#1F6E43',
+    backgroundColor: '#FFFFFF',
+  },
+  editInputMissing: {
+    borderColor: '#FEE2E2',
+    backgroundColor: '#FEF2F2',
+  },
+  editInput: {
+    flex: 1,
+    fontSize: fontSizes.sm,
+    color: '#1E293B',
+    paddingHorizontal: spacing.md,
+    fontWeight: fontWeights.bold,
+  },
   editUnit: {
-    fontSize: fontSizes.xs, color: colors.textMuted, paddingRight: spacing.md,
+    fontSize: 11,
+    color: '#64748B',
+    paddingRight: spacing.md,
+    fontWeight: fontWeights.semibold,
   },
 
   // Raw OCR text viewer
@@ -755,23 +917,25 @@ const styles = StyleSheet.create({
   },
   rawToggleIcon: {
     fontSize: 12,
-    color: colors.textSecondary,
+    color: '#64748B',
   },
   rawHint: {
     fontSize: fontSizes.xs,
-    color: colors.textMuted,
+    color: '#64748B',
     lineHeight: 18,
+    marginTop: 2,
   },
   rawTextBox: {
-    backgroundColor: '#1A1A2E',
-    borderRadius: radius.md,
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
     padding: spacing.md,
-    maxHeight: 220,
+    maxHeight: 180,
+    marginTop: spacing.sm,
   },
   rawTextContent: {
-    fontSize: 11,
-    color: '#A8D8A8',
-    fontFamily: 'monospace',
-    lineHeight: 18,
+    fontSize: 10,
+    color: '#34D399',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    lineHeight: 16,
   },
 });
