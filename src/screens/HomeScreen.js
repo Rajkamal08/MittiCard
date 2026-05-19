@@ -647,7 +647,7 @@ const getSeverityTextColor = (severity) => {
 
             {/* ── SCORE CARD ───────────────────────────────────────────────── */}
             <View style={[styles.scoreCard, shadows.md]}>
-              <Text style={styles.scoreCardTitle}>🌿 {t('advisory.score_label')}</Text>
+              <Text style={styles.scoreCardTitle}>🌱 {t('advisory.score_label')}</Text>
 
               {loading ? (
                 <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.xl }} />
