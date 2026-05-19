@@ -73,6 +73,9 @@ export const submitSoilData = data =>
 export const getAdvisory = scanId =>
   api.get(`/advisory/${scanId}`);
 
+export const getAdvisoryHistory = () =>
+  api.get('/advisory/history');
+
 export const updateSowingDate = (scanId, sowingDate) =>
   api.put(`/advisory/${scanId}/sowing-date`, { sowing_date: sowingDate });
 

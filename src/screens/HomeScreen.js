@@ -13,32 +13,32 @@ import {
 } from 'react-native';
 import Tts from 'react-native-tts';
 import i18n from '../i18n';
-import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
-import { getAdvisory } from '../services/api';
+import { colors, spacing, fontSizes, fontWeights, shadows } from '../theme';
+import api, { getAdvisory } from '../services/api';
 import { getUser, getLastScanId, clearStorage } from '../services/storage';
 import { setAuthToken } from '../services/api';
 import { useTranslation } from 'react-i18next';
 
 // ─── Score helpers ────────────────────────────────────────────────────────────
-const getScoreColor = score => {
-  if (score <= 0) return '#94A3B8'; // Neutral slate gray for empty state
+const getScoreColor = (score, hasScan) => {
+  if (!hasScan) return '#94A3B8'; // Neutral slate gray for empty state
   if (score >= 71) return colors.statusGood;
   if (score >= 41) return colors.statusFair;
   return colors.statusPoor;
 };
 
-const getScoreLabel = (score, t) => {
+const getScoreLabel = (score, t, hasScan) => {
+  if (!hasScan) return '—';
   if (score >= 71) return t('advisory.score_good');
   if (score >= 41) return t('advisory.score_fair');
-  if (score >= 1) return t('advisory.score_poor');
-  return '—';
+  return t('advisory.score_poor');
 };
 
-const getScoreEmoji = score => {
+const getScoreEmoji = (score, hasScan) => {
+  if (!hasScan) return '🌱';
   if (score >= 71) return '🟢';
   if (score >= 41) return '🟡';
-  if (score >= 1) return '🔴';
-  return '🌱';
+  return '🔴';
 };
 
 const formatDate = dateStr => {
@@ -47,8 +47,29 @@ const formatDate = dateStr => {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+const CROPS = [
+  { id: 'Wheat', en: 'Wheat', hi: 'गेहूँ' },
+  { id: 'Rice', en: 'Rice', hi: 'धान' },
+  { id: 'Maize', en: 'Maize', hi: 'मक्का' },
+  { id: 'Cotton', en: 'Cotton', hi: 'कपास' },
+  { id: 'Sugarcane', en: 'Sugarcane', hi: 'गन्ना' },
+  { id: 'Soybean', en: 'Soybean', hi: 'सोयाबीन' },
+  { id: 'Groundnut', en: 'Groundnut', hi: 'मूंगफली' },
+  { id: 'Mustard', en: 'Mustard', hi: 'सरसों' },
+  { id: 'Vegetables', en: 'Vegetables', hi: 'सब्जियां' },
+];
+
+const SOILS = [
+  { id: 'Alluvial Soil', en: 'Alluvial Soil', hi: 'जलोढ़ मिट्टी' },
+  { id: 'Black Soil', en: 'Black Soil', hi: 'काली मिट्टी' },
+  { id: 'Red Soil', en: 'Red Soil', hi: 'लाल मिट्टी' },
+  { id: 'Sandy Soil', en: 'Sandy Soil', hi: 'रेतीली मिट्टी' },
+  { id: 'Clay Soil', en: 'Clay Soil', hi: 'चिकनी मिट्टी' },
+  { id: 'Loamy Soil', en: 'Loamy Soil', hi: 'दोमट मिट्टी' },
+];
+
 // ─── Animated Score Ring ──────────────────────────────────────────────────────
-function ScoreRing({ score, color }) {
+function ScoreRing({ score, color, hasScan }) {
   const scaleAnim = useRef(new Animated.Value(0.5)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -63,9 +84,9 @@ function ScoreRing({ score, color }) {
     <Animated.View style={[styles.scoreRingOuter, { borderColor: color, opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
       <View style={[styles.scoreRingInner, { backgroundColor: color + '18' }]}>
         <Text style={[styles.scoreNumber, { color }]}>
-          {score > 0 ? score : '—'}
+          {hasScan ? score : '—'}
         </Text>
-        {score > 0 && <Text style={[styles.scoreOutOf, { color }]}>/100</Text>}
+        {hasScan && <Text style={[styles.scoreOutOf, { color }]}>/100</Text>}
       </View>
     </Animated.View>
   );
@@ -102,11 +123,11 @@ export default function HomeScreen({ navigation, route }) {
 
   // ── Weather state ──────────────────────────────────────────────────────────
   const [weather, setWeather] = useState(null);
-  const [weatherLoad, setWeatherLoad] = useState(false);
+  const [, setWeatherLoad] = useState(false);
 
   // ── Notification panel state ───────────────────────────────────────────────
-  const [showNotif, setShowNotif] = useState(false);
   const [notifBadge, setNotifBadge] = useState(0);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const headerFade = useRef(new Animated.Value(0)).current;
   const cardSlide = useRef(new Animated.Value(40)).current;
@@ -238,14 +259,89 @@ export default function HomeScreen({ navigation, route }) {
     ]).start();
   }, [headerFade, cardFade, cardSlide]);
 
+  const isHindi = i18n.language === 'hi';
+
+  // ─── WMO weather code → emoji + description ──────────────────────────────
+  const wmoWeather = (code, temp) => {
+    if (code === 0) return { emoji: '☀️', desc: isHindi ? 'साफ मौसम' : 'Clear Sky' };
+    if (code <= 2) return { emoji: '⛅', desc: isHindi ? 'आंशिक बादल' : 'Partly Cloudy' };
+    if (code === 3) return { emoji: '☁️', desc: isHindi ? 'घने बादल' : 'Overcast' };
+    if (code <= 48) return { emoji: '🌫️', desc: isHindi ? 'कोहरा' : 'Foggy' };
+    if (code <= 67) return { emoji: '🌧️', desc: isHindi ? 'बारिश' : 'Rainy' };
+    if (code <= 77) return { emoji: '❄️', desc: isHindi ? 'बर्फबारी' : 'Snowy' };
+    if (code <= 82) return { emoji: '🌦️', desc: isHindi ? 'हल्की बौछारें' : 'Rain Showers' };
+    if (code <= 99) return { emoji: '⛈️', desc: isHindi ? 'आंधी-तूफान' : 'Thunderstorm' };
+    return { emoji: temp > 35 ? '🌡️' : '🌤️', desc: isHindi ? 'सुहावना मौसम' : 'Mild Weather' };
+  };
+
+
+
+  // ─── Fetch weather using dynamic coordinates ───────────────────────────────
+  const loadWeather = useCallback(async () => {
+    setWeatherLoad(true);
+    try {
+      let lat = 21.25;
+      let lon = 81.63; // Default Raipur
+
+      const userDistrict = user?.district || '';
+      if (userDistrict.trim()) {
+        try {
+          // Dynamic Geocoding using Open-Meteo free API to look up any state/district!
+          const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(userDistrict.trim())}&count=1&language=en&format=json`;
+          const geoRes = await fetch(geoUrl);
+          const geoData = await geoRes.json();
+          if (geoData.results && geoData.results[0]) {
+            lat = geoData.results[0].latitude;
+            lon = geoData.results[0].longitude;
+          }
+        } catch {
+          const dist = userDistrict.toLowerCase();
+          if (dist.includes('raipur')) { lat = 21.25; lon = 81.63; }
+        }
+      } else {
+        try {
+          const locRes = await fetch('https://freeipapi.com/api/json');
+          const locData = await locRes.json();
+          if (locData.latitude) {
+            lat = locData.latitude;
+            lon = locData.longitude;
+          }
+        } catch {}
+      }
+
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&current_weather=true&timezone=Asia%2FKolkata`;
+      const wRes = await fetch(url);
+      const wData = await wRes.json();
+      if (wData.current_weather) {
+        setWeather(wData.current_weather);
+      } else {
+        setWeather({ temperature: 32.5, windspeed: 8.5, weathercode: 1 });
+      }
+    } catch {
+      setWeather({ temperature: 32.5, windspeed: 8.5, weathercode: 1 });
+    } finally {
+      setWeatherLoad(false);
+    }
+  }, [user]);
+
   // ─── Load user + last scan on mount ────────────────────────────────────────
   const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
-      // Get user from storage if not in route params
-      if (!user) {
-        const storedUser = await getUser();
-        if (storedUser) setUser(storedUser);
+      // Fetch latest profile details from Postgres API first to ensure dynamic changes are read
+      try {
+        const meRes = await api.get('/auth/me');
+        if (meRes.data?.success && meRes.data?.user) {
+          setUser(meRes.data.user);
+        } else if (!user) {
+          const storedUser = await getUser();
+          if (storedUser) setUser(storedUser);
+        }
+      } catch {
+        if (!user) {
+          const storedUser = await getUser();
+          if (storedUser) setUser(storedUser);
+        }
       }
 
       // Get last scan ID → fetch advisory
@@ -256,6 +352,9 @@ export default function HomeScreen({ navigation, route }) {
           setLastScan(response.data.data);
         }
       }
+
+      // Fetch weather updates as well
+      loadWeather();
       setError(null);
     } catch (err) {
       // Don't show error if it's just "no scan yet"
@@ -266,7 +365,7 @@ export default function HomeScreen({ navigation, route }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user]);
+  }, [user, loadWeather]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -283,26 +382,7 @@ export default function HomeScreen({ navigation, route }) {
     navigation.replace('Login');
   };
 
-  // ─── Fetch weather using IP-based location (no GPS permission needed) ────────
-  useEffect(() => {
-    const fetchWeather = async () => {
-      setWeatherLoad(true);
-      try {
-        // Step 1: Get lat/lon from IP address (free, no key, no permission)
-        const locRes = await fetch('https://ip-api.com/json/');
-        const locData = await locRes.json();
-        if (!locData.lat) throw new Error('Location unavailable');
 
-        // Step 2: Fetch weather from Open-Meteo (free, no key)
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${locData.lat.toFixed(2)}&longitude=${locData.lon.toFixed(2)}&current_weather=true&timezone=Asia%2FKolkata`;
-        const wRes = await fetch(url);
-        const wData = await wRes.json();
-        if (wData.current_weather) setWeather(wData.current_weather);
-      } catch { /* fail silently — weather is optional */ }
-      setWeatherLoad(false);
-    };
-    fetchWeather();
-  }, []);
 
   // ─── Build notifications from scan data ─────────────────────────────────────
   useEffect(() => {
@@ -318,18 +398,7 @@ export default function HomeScreen({ navigation, route }) {
     setNotifBadge(alerts.length);
   }, [lastScan]);
 
-  // ─── WMO weather code → emoji + description ──────────────────────────────
-  const wmoWeather = (code, temp) => {
-    if (code === 0) return { emoji: '☀️', desc: 'Clear sky' };
-    if (code <= 2) return { emoji: '⛅', desc: 'Partly cloudy' };
-    if (code === 3) return { emoji: '☁️', desc: 'Overcast' };
-    if (code <= 48) return { emoji: '🌫️', desc: 'Foggy' };
-    if (code <= 67) return { emoji: '🌧️', desc: 'Rainy' };
-    if (code <= 77) return { emoji: '❄️', desc: 'Snowy' };
-    if (code <= 82) return { emoji: '🌦️', desc: 'Rain showers' };
-    if (code <= 99) return { emoji: '⛈️', desc: 'Thunderstorm' };
-    return { emoji: temp > 35 ? '🌡️' : '🌤️', desc: 'Variable' };
-  };
+
 
   // ─── Notification items built from scan ──────────────────────────────────
 // ─── Notification Severity Helpers ────────────────────────────────────────────
@@ -382,7 +451,6 @@ const getSeverityTextColor = (severity) => {
 };
 
   const buildNotifications = () => {
-    const isHindi = i18n.language === 'hi';
     const list = [];
     if (!lastScan) {
       list.push({ 
@@ -520,14 +588,11 @@ const getSeverityTextColor = (severity) => {
     return list;
   };
 
-  // ─── Greeting based on time ─────────────────────────────────────────────────
-  const hour = new Date().getHours();
-  const greetEmoji = hour < 12 ? '☀️' : hour < 17 ? '🌤️' : '🌙';
   const firstName = user?.name?.split(' ')[0] || t('home.greeting_default').replace('नमस्ते, ', '').replace('Hello, ', '');
-  const greeting = t('home.greeting', { name: firstName });
 
-  const score = lastScan?.soil_health_score || 0;
-  const scoreColor = getScoreColor(score);
+  const hasScan = !!lastScan;
+  const score = hasScan ? (lastScan.soil_health_score ?? 0) : 0;
+  const scoreColor = getScoreColor(score, hasScan);
 
   return (
     <View style={styles.container}>
@@ -551,25 +616,30 @@ const getSeverityTextColor = (severity) => {
             {/* Greeting row */}
             <View style={styles.greetingRow}>
               <View>
-                <Text style={styles.greetingText}>{greetEmoji} {greeting}</Text>
                 <Text style={styles.farmerName}>{firstName}</Text>
-                {user?.phone && (
-                  <Text style={styles.farmerPhone}>+91 {user.phone}</Text>
-                )}
               </View>
-              {/* Notification bell + logout */}
+              {/* Settings Action with notification dot & weather */}
               <View style={styles.headerActions}>
-                {/* Bell with badge */}
-                <TouchableOpacity style={styles.iconBtnRelative} onPress={() => setShowNotif(true)}>
-                  <Text style={styles.iconBtnText}>🔔</Text>
+                {/* Weather Capsule Badge */}
+                <TouchableOpacity
+                  style={styles.miniWeatherBadge}
+                  onPress={() => navigation.navigate('WeatherForecast')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.miniWeatherText}>
+                    {wmoWeather(weather?.weathercode ?? 0, weather?.temperature ?? 32).emoji}{' '}
+                    <Text style={styles.weatherTempNumber}>{Math.round(weather?.temperature ?? 32)}</Text>
+                    <Text style={styles.weatherTempDegree}>°C</Text>
+                  </Text>
+                </TouchableOpacity>
+                {/* Unified profile settings button with built-in notification dot */}
+                <TouchableOpacity style={styles.iconBtnRelative} onPress={() => setShowProfileModal(true)}>
+                  <Text style={styles.iconBtnText}>⚙️</Text>
                   {notifBadge > 0 && (
                     <View style={styles.notifBadge}>
                       <Text style={styles.notifBadgeText}>{notifBadge}</Text>
                     </View>
                   )}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconBtn} onPress={handleLogout}>
-                  <Text style={styles.iconBtnText}>↩️</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -583,7 +653,7 @@ const getSeverityTextColor = (severity) => {
               ) : (
                 <View style={styles.scoreCardBody}>
                   {/* Compact score ring (90px) */}
-                  <ScoreRing score={score} color={scoreColor} />
+                  <ScoreRing score={score} color={scoreColor} hasScan={hasScan} />
 
                   {/* Right side info */}
                   <View style={styles.scoreCardRight}>
@@ -591,7 +661,7 @@ const getSeverityTextColor = (severity) => {
                       <>
                         <View style={[styles.scoreLabelBadge, { backgroundColor: scoreColor + '20' }]}>
                           <Text style={[styles.scoreLabelText, { color: scoreColor }]}>
-                            {getScoreEmoji(score)} {getScoreLabel(score, t)}
+                            {getScoreEmoji(score, hasScan)} {getScoreLabel(score, t, hasScan)}
                           </Text>
                         </View>
 
@@ -666,30 +736,7 @@ const getSeverityTextColor = (severity) => {
             { opacity: cardFade, transform: [{ translateY: cardSlide }] },
           ]}
         >
-          {/* ── STANDALONE WEATHER CARD ──────────────────────────────────── */}
-          {(weather || weatherLoad) && (
-            <View style={[styles.weatherCard, shadows.sm]}>
-              {weatherLoad ? (
-                <ActivityIndicator color={colors.primary} size="small" />
-              ) : weather ? (
-                <View style={styles.weatherCardContent}>
-                  <View style={styles.weatherLeft}>
-                    <Text style={styles.weatherEmoji}>{wmoWeather(weather.weathercode, weather.temperature).emoji}</Text>
-                    <View>
-                      <Text style={styles.weatherTemp}>{Math.round(weather.temperature)}°C</Text>
-                      <Text style={styles.weatherDesc}>{wmoWeather(weather.weathercode, weather.temperature).desc}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.weatherRight}>
-                    <Text style={styles.weatherWind}>💨 {weather.windspeed} km/h</Text>
-                    <Text style={styles.weatherTip}>
-                      {weather.temperature > 35 ? '🌡️ Hot — irrigate crops' : weather.temperature < 15 ? '🥶 Cold — protect seedlings' : '✅ Good conditions'}
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
-            </View>
-          )}
+
 
           {/* ── FARM & RECENT ACTIVITY SUMMARY CARD ───────────────────────── */}
           <View style={[styles.summaryCard, shadows.sm]}>
@@ -747,6 +794,7 @@ const getSeverityTextColor = (severity) => {
             </View>
           )}
 
+
           {/* ── PRIMARY ACTIONS — HIERARCHICAL CTAS ────────────────────────── */}
           <View style={styles.primaryActionsCol}>
             {/* OCR camera (Primary Action) */}
@@ -788,12 +836,7 @@ const getSeverityTextColor = (severity) => {
               style={[styles.actionCard, !lastScan && styles.actionCardDisabled, shadows.sm]}
               onPress={() =>
                 lastScan
-                  ? navigation.navigate('AdvisoryResult', {
-                    advisory: lastScan,
-                    scan_id: lastScan.id,
-                    crop: lastScan.crop,
-                    farmSize: lastScan.farm_size_acres,
-                  })
+                  ? navigation.navigate('SoilHistory')
                   : null
               }
               activeOpacity={lastScan ? 0.85 : 1}
@@ -856,6 +899,41 @@ const getSeverityTextColor = (severity) => {
             </View>
           </View>
 
+          {/* ── AGRI SERVICES GRID ─────────────────────────────────────────── */}
+          <View style={{ marginTop: spacing.lg, marginBottom: spacing.xs }}>
+            <Text style={styles.sectionTitle}>
+              {isHindi ? 'कृषि सेवाएं और सहायता' : 'Agri Services & Portal'}
+            </Text>
+          </View>
+          
+          <View style={styles.actionsRow}>
+            {/* Agri Helpline */}
+            <TouchableOpacity
+              style={[styles.actionCard, shadows.sm]}
+              onPress={() => navigation.navigate('AgriServices', { tab: 'helpline' })}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.actionEmoji}>📞</Text>
+              <Text style={styles.actionTitle}>{isHindi ? 'कृषि विशेषज्ञ' : 'Agri Helpline'}</Text>
+              <Text style={styles.actionSub}>
+                {isHindi ? 'सलाहकार संपर्क' : 'Call or Chat Expert'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Seed & Fertilizer Rates */}
+            <TouchableOpacity
+              style={[styles.actionCard, shadows.sm]}
+              onPress={() => navigation.navigate('AgriServices', { tab: 'rates' })}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.actionEmoji}>💰</Text>
+              <Text style={styles.actionTitle}>{isHindi ? 'खाद-बीज दरें' : 'Market Rates'}</Text>
+              <Text style={styles.actionSub}>
+                {isHindi ? 'छत्तीसगढ़ सरकारी दरें' : 'Fertilizer & Seeds'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* ── ERROR STATE ──────────────────────────────────────────────── */}
           {error && (
             <Text style={styles.errorText}>⚠️ {error}</Text>
@@ -872,52 +950,221 @@ const getSeverityTextColor = (severity) => {
         <Text style={styles.fabIcon}>📷</Text>
       </TouchableOpacity>
 
-      {/* ── NOTIFICATION MODAL ────────────────────────────────────────── */}
+      {/* ── PROFILE & SETTINGS MODAL ────────────────────────────────────── */}
       <Modal
-        visible={showNotif}
-        animationType="slide"
+        visible={showProfileModal}
+        animationType="fade"
         transparent={true}
-        onRequestClose={() => setShowNotif(false)}
+        onRequestClose={() => setShowProfileModal(false)}
       >
         <TouchableOpacity
           style={styles.notifOverlay}
           activeOpacity={1}
-          onPress={() => setShowNotif(false)}
+          onPress={() => setShowProfileModal(false)}
         >
-          <View style={styles.notifSheet}>
-            {/* Handle */}
-            <View style={styles.notifHandleRow}>
-              <View style={styles.notifHandle} />
-            </View>
-
+          <TouchableOpacity
+            style={styles.notifSheet}
+            activeOpacity={1}
+            onPress={() => {}}
+          >
             {/* Header */}
             <View style={styles.notifSheetHeader}>
-              <Text style={styles.notifSheetTitle}>🔔 Soil Alerts</Text>
-              {notifBadge > 0 && (
-                <View style={styles.notifCountPill}>
-                  <Text style={styles.notifCountText}>{notifBadge} alerts</Text>
-                </View>
-              )}
+              <Text style={styles.notifSheetTitle}>⚙️ {isHindi ? 'खाता सेटिंग्स' : 'Account Settings'}</Text>
+              <TouchableOpacity onPress={() => setShowProfileModal(false)} style={styles.closeBtnCircle}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Notification list (Card styled) */}
-            <ScrollView style={styles.notifScroll} showsVerticalScrollIndicator={false}>
-              {buildNotifications().map(n => {
-                const cardStyle = getNotifCardStyle(n.severity);
-                const titleColor = getSeverityTextColor(n.severity);
-                return (
-                  <View key={n.id} style={[styles.notifCardItem, shadows.sm, cardStyle]}>
-                    <Text style={styles.notifCardIcon}>{n.icon}</Text>
-                    <View style={styles.notifCardBody}>
-                      <Text style={[styles.notifCardTitle, { color: titleColor }]}>{n.title}</Text>
-                      <Text style={styles.notifCardText}>{n.body}</Text>
-                    </View>
+            {/* Profile Content */}
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.profileSheetContent}>
+              {/* User Avatar & Name Card */}
+              <View style={styles.profileCardHeader}>
+                <View style={styles.profileAvatarLarge}>
+                  <Text style={styles.profileAvatarText}>
+                    {(user?.name || 'F').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View>
+                  <Text style={styles.profileNameText}>{user?.name || 'Farmer'}</Text>
+                  <Text style={styles.profileRoleText}>🌾 {isHindi ? 'खाता: किसान' : 'Account: Farmer'}</Text>
+                </View>
+              </View>
+
+              {/* Profile Details Card - Unified List Layout */}
+              <View style={styles.profileDetailsCard}>
+                <View style={styles.profileDetailRow}>
+                  <View style={styles.profileDetailLabelCol}>
+                    <Text style={styles.profileDetailRowIcon}>📞</Text>
+                    <Text style={styles.profileDetailRowLabel}>{isHindi ? 'फ़ोन नंबर' : 'Phone Number'}</Text>
                   </View>
-                );
-              })}
-              <View style={styles.notifListFooter} />
+                  <Text style={styles.profileDetailRowValue}>+91 {user?.phone || 'XXXXXXXXXX'}</Text>
+                </View>
+
+                {user?.village ? (
+                  <View style={styles.profileDetailRow}>
+                    <View style={styles.profileDetailLabelCol}>
+                      <Text style={styles.profileDetailRowIcon}>🏠</Text>
+                      <Text style={styles.profileDetailRowLabel}>{isHindi ? 'ग्राम / ब्लॉक' : 'Village / Block'}</Text>
+                    </View>
+                    <Text style={styles.profileDetailRowValue}>{user.village}</Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.profileDetailRow}>
+                  <View style={styles.profileDetailLabelCol}>
+                    <Text style={styles.profileDetailRowIcon}>📍</Text>
+                    <Text style={styles.profileDetailRowLabel}>{isHindi ? 'स्थान / जिला' : 'Location / District'}</Text>
+                  </View>
+                  <Text style={styles.profileDetailRowValue}>{user?.district || 'Raipur'}, {user?.state || 'Chhattisgarh'}</Text>
+                </View>
+
+                {user?.farm_size ? (
+                  <View style={styles.profileDetailRow}>
+                    <View style={styles.profileDetailLabelCol}>
+                      <Text style={styles.profileDetailRowIcon}>📏</Text>
+                      <Text style={styles.profileDetailRowLabel}>{isHindi ? 'खेत का आकार' : 'Farm Size'}</Text>
+                    </View>
+                    <Text style={styles.profileDetailRowValue}>{user.farm_size} {isHindi ? 'एकड़' : 'Acres'}</Text>
+                  </View>
+                ) : null}
+
+                {user?.primary_crop ? (
+                  <View style={styles.profileDetailRow}>
+                    <View style={styles.profileDetailLabelCol}>
+                      <Text style={styles.profileDetailRowIcon}>🌱</Text>
+                      <Text style={styles.profileDetailRowLabel}>{isHindi ? 'प्राथमिक फसल' : 'Primary Crop'}</Text>
+                    </View>
+                    <Text style={styles.profileDetailRowValue}>
+                      {isHindi 
+                        ? (CROPS.find(c => c.id === user.primary_crop)?.hi || user.primary_crop) 
+                        : (CROPS.find(c => c.id === user.primary_crop)?.en || user.primary_crop)}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {user?.soil_type ? (
+                  <View style={styles.profileDetailRow}>
+                    <View style={styles.profileDetailLabelCol}>
+                      <Text style={styles.profileDetailRowIcon}>🏜️</Text>
+                      <Text style={styles.profileDetailRowLabel}>{isHindi ? 'मिट्टी का प्रकार' : 'Soil Type'}</Text>
+                    </View>
+                    <Text style={styles.profileDetailRowValue}>
+                      {isHindi 
+                        ? (SOILS.find(s => s.id === user.soil_type)?.hi || user.soil_type) 
+                        : (SOILS.find(s => s.id === user.soil_type)?.en || user.soil_type)}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {user?.farming_experience ? (
+                  <View style={styles.profileDetailRow}>
+                    <View style={styles.profileDetailLabelCol}>
+                      <Text style={styles.profileDetailRowIcon}>⏳</Text>
+                      <Text style={styles.profileDetailRowLabel}>{isHindi ? 'खेती का अनुभव' : 'Farming Experience'}</Text>
+                    </View>
+                    <Text style={styles.profileDetailRowValue}>
+                      {isHindi ? user.farming_experience.replace('Years', 'वर्ष') : user.farming_experience}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {user?.water_source ? (
+                  <View style={styles.profileDetailRow}>
+                    <View style={styles.profileDetailLabelCol}>
+                      <Text style={styles.profileDetailRowIcon}>🚰</Text>
+                      <Text style={styles.profileDetailRowLabel}>{isHindi ? 'सिंचाई का साधन' : 'Irrigation Source'}</Text>
+                    </View>
+                    <Text style={styles.profileDetailRowValue}>
+                      {user.water_source === 'Borewell' ? (isHindi ? 'बोरवेल 🚰' : 'Borewell 🚰') :
+                       user.water_source === 'Canal' ? (isHindi ? 'नहर 🌊' : 'Canal 🌊') :
+                       user.water_source === 'Rainfed' ? (isHindi ? 'वर्षा-आधारित 🌧️' : 'Rainfed 🌧️') : (isHindi ? 'ड्रिप सिंचाई 💧' : 'Drip 💧')}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {user?.farming_type ? (
+                  <View style={styles.profileDetailRow}>
+                    <View style={styles.profileDetailLabelCol}>
+                      <Text style={styles.profileDetailRowIcon}>🍀</Text>
+                      <Text style={styles.profileDetailRowLabel}>{isHindi ? 'खेती की पद्धति' : 'Farming Method'}</Text>
+                    </View>
+                    <Text style={styles.profileDetailRowValue}>
+                      {user.farming_type === 'Organic' ? (isHindi ? 'जैविक 🍀' : 'Organic 🍀') :
+                       user.farming_type === 'Conventional' ? (isHindi ? 'रासायनिक 🧪' : 'Conventional 🧪') : (isHindi ? 'प्राकृतिक 🌸' : 'Natural 🌸')}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <View style={[styles.profileDetailRow, { borderBottomWidth: 0 }]}>
+                  <View style={styles.profileDetailLabelCol}>
+                    <Text style={styles.profileDetailRowIcon}>📅</Text>
+                    <Text style={styles.profileDetailRowLabel}>{isHindi ? 'अंतिम सक्रियता' : 'Last Active'}</Text>
+                  </View>
+                  <Text style={styles.profileDetailRowValue}>
+                    {lastScan ? formatDate(lastScan.scanned_at) : (isHindi ? 'कोई स्कैन नहीं' : 'No scans yet')}
+                  </Text>
+                </View>
+              </View>
+
+              {/* INTEGRATED SOIL ALERTS SECTION */}
+              <View style={styles.alertSectionHeader}>
+                <Text style={styles.alertSectionTitle}>🔔 {isHindi ? 'मिट्टी स्वास्थ्य एवं बुवाई चेतावनी' : 'Soil Health & Sowing Alerts'}</Text>
+                {notifBadge > 0 && (
+                  <View style={styles.alertSectionCountPill}>
+                    <Text style={styles.alertSectionCountText}>{notifBadge} alerts</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.alertsListContainer}>
+                {buildNotifications().length > 0 ? (
+                  buildNotifications().map(n => {
+                    const cardStyle = getNotifCardStyle(n.severity);
+                    const titleColor = getSeverityTextColor(n.severity);
+                    return (
+                      <View key={n.id} style={[styles.notifCardItemCompact, cardStyle]}>
+                        <Text style={styles.notifCardIconCompact}>{n.icon}</Text>
+                        <View style={styles.notifCardBody}>
+                          <Text style={[styles.notifCardTitleCompact, { color: titleColor }]}>{n.title}</Text>
+                          <Text style={styles.notifCardTextCompact}>{n.body}</Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <View style={styles.emptyAlertsCard}>
+                    <Text style={styles.emptyAlertsIcon}>✅</Text>
+                    <Text style={styles.emptyAlertsText}>
+                      {isHindi ? 'सभी मिट्टी पैरामीटर सही सीमा में हैं।' : 'All soil nutrients are in perfect range!'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.profileSheetActions}>
+                <TouchableOpacity
+                  style={[styles.profileActionBtn, styles.profileEditBtn]}
+                  onPress={() => {
+                    setShowProfileModal(false);
+                    navigation.navigate('Profile', { user, language: i18n.language });
+                  }}
+                >
+                  <Text style={styles.profileEditBtnText}>✏️ {isHindi ? 'जानकारी बदलें' : 'Edit Profile'}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.profileActionBtn, styles.profileLogoutBtn]}
+                  onPress={() => {
+                    setShowProfileModal(false);
+                    handleLogout();
+                  }}
+                >
+                  <Text style={styles.profileLogoutBtnText}>↩️ {isHindi ? 'लॉगआउट' : 'Logout'}</Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 
@@ -1004,44 +1251,60 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
   },
+  miniWeatherBadge: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniWeatherText: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.extrabold,
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(255, 255, 255, 0.85)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
   iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBtnRelative: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   iconBtnText: {
-    fontSize: 16,
+    fontSize: 22,
   },
   notifBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    top: -3,
+    right: -3,
     backgroundColor: '#EF4444',
-    borderRadius: 7,
-    minWidth: 14,
-    height: 14,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 2,
+    paddingHorizontal: 3,
   },
   notifBadgeText: {
     color: '#fff',
-    fontSize: 8,
-    fontWeight: '800',
+    fontSize: 9,
+    fontWeight: '900',
   },
 
   // Score Card inside header
@@ -1195,51 +1458,39 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
 
-  // Weather Card (Standalone)
-  weatherCard: {
-    backgroundColor: '#F0FDF4', // Minty light green
+
+
+  // Compact Agricultural Sowing Advisory Card
+  compactSowingCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: '#DCFCE7',
+    borderColor: '#E2E8F0',
+    borderLeftWidth: 5,
   },
-  weatherCardContent: {
+  sowingHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  weatherLeft: {
-    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 6,
   },
-  weatherEmoji: {
-    fontSize: 26,
-    marginRight: 8,
-  },
-  weatherTemp: {
-    color: '#166534',
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-  },
-  weatherDesc: {
-    color: '#15803D',
+  sowingTag: {
     fontSize: 10,
-    marginTop: 1,
+    fontWeight: fontWeights.extrabold,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
-  weatherRight: {
-    alignItems: 'flex-end',
-    flex: 1,
-    marginLeft: 8,
+  sowingLocText: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.bold,
+    color: '#64748B',
   },
-  weatherWind: {
-    color: '#166534',
-    fontSize: 11,
-  },
-  weatherTip: {
-    color: '#15803D',
-    fontSize: 9,
-    marginTop: 2,
-    textAlign: 'right',
+  sowingText: {
+    fontSize: fontSizes.xs,
+    color: '#334155',
+    lineHeight: 18,
+    fontWeight: fontWeights.medium,
   },
 
   // Summary Card
@@ -1266,6 +1517,115 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: '#22C55E',
+  },
+
+  // Profile Sheet Styles
+  profileSheetContent: {
+    padding: spacing.md,
+    gap: spacing.lg,
+  },
+  profileCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  profileAvatarLarge: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#1B4D3E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileAvatarText: {
+    fontSize: 24,
+    fontWeight: fontWeights.bold,
+    color: '#FFFFFF',
+  },
+  profileNameText: {
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.extrabold,
+    color: '#1E293B',
+  },
+  profileRoleText: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.semibold,
+    color: '#16A34A',
+    marginTop: 2,
+  },
+  profileDetailsCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  profileDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  profileDetailLabelCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  profileDetailRowIcon: {
+    fontSize: 16,
+  },
+  profileDetailRowLabel: {
+    fontSize: 13,
+    fontWeight: fontWeights.semibold,
+    color: '#64748B',
+  },
+  profileDetailRowValue: {
+    fontSize: 13,
+    fontWeight: fontWeights.bold,
+    color: '#0F172A',
+    textAlign: 'right',
+  },
+  profileSheetActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
+  profileActionBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  profileEditBtn: {
+    backgroundColor: '#1F6E43',
+    borderColor: '#1F6E43',
+    shadowColor: '#1F6E43',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  profileEditBtnText: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.bold,
+    color: '#FFFFFF',
+  },
+  profileLogoutBtn: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FEE2E2',
+  },
+  profileLogoutBtnText: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.bold,
+    color: '#EF4444',
   },
   summaryGrid: {
     flexDirection: 'row',
@@ -1556,38 +1916,32 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // Notification Modal (Bottom sheet card-styled)
+  // Notification Modal (Centered Premium Card Dialog)
   notifOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
   notifSheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#F8FAF9',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '76%',
-    paddingBottom: 24,
-  },
-  notifHandleRow: {
-    alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
-  notifHandle: {
-    width: 36,
-    height: 4,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    width: '100%',
+    maxHeight: '85%',
+    paddingBottom: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 10,
   },
   notifSheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
+    paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
@@ -1595,7 +1949,20 @@ const styles = StyleSheet.create({
   notifSheetTitle: {
     fontSize: 16,
     fontWeight: fontWeights.bold,
-    color: '#1E293B',
+    color: '#0F172A',
+  },
+  closeBtnCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748B',
   },
   notifCountPill: {
     backgroundColor: '#EF4444',
@@ -1713,5 +2080,97 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: fontSizes.xs,
     color: colors.statusPoor,
+  },
+
+  // Integrated compact alerts section styles
+  alertSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1.5,
+    borderTopColor: '#F1F5F9',
+    marginBottom: spacing.xs,
+  },
+  alertSectionTitle: {
+    fontSize: 10,
+    fontWeight: fontWeights.extrabold,
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  alertSectionCountPill: {
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  alertSectionCountText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '700',
+  },
+  alertsListContainer: {
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  notifCardItemCompact: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  notifCardIconCompact: {
+    fontSize: 14,
+    marginTop: 1,
+  },
+  notifCardTitleCompact: {
+    fontSize: 10,
+    fontWeight: fontWeights.extrabold,
+    marginBottom: 2,
+  },
+  notifCardTextCompact: {
+    fontSize: 9,
+    color: '#64748B',
+    lineHeight: 13,
+  },
+  emptyAlertsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: '#F0FDF4',
+    borderColor: '#DCFCE7',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  emptyAlertsIcon: {
+    fontSize: 14,
+  },
+  emptyAlertsText: {
+    fontSize: 11,
+    color: '#15803D',
+    fontWeight: fontWeights.bold,
+  },
+  weatherTempNumber: {
+    fontSize: 20,
+    fontWeight: fontWeights.extrabold,
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(255, 255, 255, 0.85)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  weatherTempDegree: {
+    fontSize: 16,
+    fontWeight: fontWeights.bold,
+    color: 'rgba(255, 255, 255, 0.75)',
+    textShadowColor: 'rgba(255, 255, 255, 0.4)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 4,
   },
 });

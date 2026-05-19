@@ -29,6 +29,9 @@ import SoilInputScreen       from './src/screens/SoilInputScreen';
 import AdvisoryResultScreen  from './src/screens/AdvisoryResultScreen';
 import CropCalendarScreen    from './src/screens/CropCalendarScreen';
 import OCRScreen             from './src/screens/OCRScreen';
+import SoilHistoryScreen     from './src/screens/SoilHistoryScreen';
+import WeatherForecastScreen from './src/screens/WeatherForecastScreen';
+import AgriServicesScreen    from './src/screens/AgriServicesScreen';
 
 // Services
 import {
@@ -168,6 +171,9 @@ export default function App() {
         <Stack.Screen name="AdvisoryResult" component={AdvisoryResultScreen} />
         <Stack.Screen name="CropCalendar"   component={CropCalendarScreen} />
         <Stack.Screen name="OCR"            component={OCRScreen} />
+        <Stack.Screen name="SoilHistory"    component={SoilHistoryScreen} />
+        <Stack.Screen name="WeatherForecast" component={WeatherForecastScreen} />
+        <Stack.Screen name="AgriServices"   component={AgriServicesScreen} />
 
       </Stack.Navigator>
     </NavigationContainer>
