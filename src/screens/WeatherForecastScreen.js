@@ -10,8 +10,8 @@ import {
   RefreshControl,
 } from 'react-native';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
-import i18n from '../i18n';
 import { useTranslation } from 'react-i18next';
+import Tts from 'react-native-tts';
 import { getUser } from '../services/storage';
 import api from '../services/api';
 
@@ -100,6 +100,66 @@ export default function WeatherForecastScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [districtName, setDistrictName] = useState('Raipur');
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
+  // Voice assistant synthesis for weather report
+  useEffect(() => {
+    let active = true;
+    if (isPlayingAudio && forecast.length > 0) {
+      const today = forecast[0];
+      const sowing = calculateSowingScore(today.maxTemp, today.rainProb, today.windSpeed, isHindi);
+      const wInfo = getWeatherInfo(today.weatherCode, isHindi);
+
+      const text = isHindi
+        ? `आज ${districtName} में मौसम ${wInfo.desc} है और तापमान ${Math.round(today.minTemp)} से ${Math.round(today.maxTemp)} डिग्री सेल्सियस के बीच रहेगा। आज बुवाई की स्थिति ${sowing.statusText} है, जिसका स्कोर 100 में से ${sowing.score} है।`
+        : `Today in ${districtName}, the weather is ${wInfo.desc} with a temperature between ${Math.round(today.minTemp)} and ${Math.round(today.maxTemp)} degrees Celsius. The sowing condition today is ${sowing.statusText} with a score of ${sowing.score} out of 100.`;
+
+      const startSpeak = async () => {
+        try {
+          await Tts.getInitStatus();
+          const lang = isHindi ? 'hi-IN' : 'en-IN';
+          await Tts.setDefaultLanguage(lang);
+          await Tts.setDefaultRate(0.48);
+          await Tts.setDefaultPitch(1.0);
+          await Tts.setDucking(true);
+          
+          if (active) {
+            Tts.speak(text, {
+              androidParams: {
+                KEY_PARAM_PAN: 0.0,
+                KEY_PARAM_VOLUME: 1.0,
+                KEY_PARAM_STREAM: 'STREAM_MUSIC',
+              }
+            });
+          }
+        } catch (err) {
+          Tts.setDefaultLanguage('en-US').then(() => {
+            if (active) Tts.speak(text);
+          }).catch(() => {});
+        }
+      };
+
+      startSpeak();
+
+      const finishSub = Tts.addEventListener('tts-finish', () => {
+        if (active) setIsPlayingAudio(false);
+      });
+      const cancelSub = Tts.addEventListener('tts-cancel', () => {
+        if (active) setIsPlayingAudio(false);
+      });
+      const errorSub = Tts.addEventListener('tts-error', () => {
+        if (active) setIsPlayingAudio(false);
+      });
+
+      return () => {
+        active = false;
+        finishSub.remove();
+        cancelSub.remove();
+        errorSub.remove();
+        Tts.stop();
+      };
+    }
+  }, [isPlayingAudio, forecast, isHindi, districtName]);
 
   const fetchForecast = useCallback(async (showIndicator = true) => {
     if (showIndicator) setLoading(true);
@@ -227,6 +287,34 @@ export default function WeatherForecastScreen({ navigation, route }) {
               {isHindi ? 'बुवाई का स्कोर तापमान, हवा की गति और वर्षा की संभावना के आधार पर तय किया जाता है।' : 'Sowing score is calculated based on temperature, wind speed, and rain probability.'}
             </Text>
           </View>
+
+          {/* Voice report card */}
+          {forecast.length > 0 && (
+            <TouchableOpacity 
+              style={[styles.voiceAssistantCard, shadows.sm]} 
+              onPress={() => setIsPlayingAudio(prev => !prev)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.voiceAssistantLeft}>
+                <Text style={styles.voiceAssistantIcon}>{isPlayingAudio ? '🔊' : '🔈'}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.voiceAssistantTitle}>
+                    {isHindi ? 'मौसम रिपोर्ट सुनें' : 'Listen Weather Report'}
+                  </Text>
+                  <Text style={styles.voiceAssistantSub}>
+                    {isPlayingAudio 
+                      ? (isHindi ? 'ऑडियो चल रहा है... बंद करने के लिए दोबारा दबाएं' : 'Playing audio... Tap again to stop') 
+                      : (isHindi ? 'आज के मौसम और बुवाई की स्थिति की रिपोर्ट सुनें' : 'Hear today\'s weather and sowing conditions')}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.listenPill, isPlayingAudio && { backgroundColor: '#EF4444' }]}>
+                <Text style={[styles.listenPillText, isPlayingAudio && { color: '#FFFFFF' }]}>
+                  {isPlayingAudio ? (isHindi ? 'रोकें' : 'STOP') : (isHindi ? 'सुनें' : 'PLAY')}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
 
           {/* Forecast title */}
           <Text style={styles.sectionTitle}>
@@ -461,5 +549,48 @@ const styles = StyleSheet.create({
   advisoryTipText: {
     fontSize: fontSizes.xs,
     lineHeight: 15,
+  },
+  // Voice Assistant Card
+  voiceAssistantCard: {
+    backgroundColor: '#F8FAF9',
+    borderWidth: 1.5,
+    borderColor: '#DCFCE7',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  voiceAssistantLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flex: 1,
+  },
+  voiceAssistantIcon: {
+    fontSize: 24,
+  },
+  voiceAssistantTitle: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.bold,
+    color: '#1B4D3E',
+  },
+  voiceAssistantSub: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  listenPill: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  listenPillText: {
+    fontSize: 9,
+    fontWeight: fontWeights.extrabold,
+    color: '#15803D',
   },
 });
