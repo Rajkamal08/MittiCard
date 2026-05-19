@@ -6,7 +6,8 @@
 [![Database](https://img.shields.io/badge/Database-PostgreSQL-blue)](https://render.com)
 [![Mobile](https://img.shields.io/badge/Mobile-React%20Native-61DAFB)](https://reactnative.dev)
 [![OTP](https://img.shields.io/badge/OTP-2Factor%20Voice%20Call-orange)](https://2factor.in)
-[![AI](https://img.shields.io/badge/OCR-Gemini%20Vision%20API-purple)](https://ai.google.dev)
+[![AI](https://img.shields.io/badge/OCR-Groq%20Llama%203.2%20Vision-purple)](https://groq.com)
+[![Weather](https://img.shields.io/badge/Weather-Open--Meteo%20API-yellow)](https://open-meteo.com)
 
 ---
 
@@ -14,7 +15,7 @@
 
 MittiCard is a mobile app that helps Indian farmers understand their soil health. A farmer scans their **ICAR Soil Health Card** with the camera, and the app:
 
-1. Extracts **8 soil nutrients** (pH, N, P, K, OC, Zn, S, Fe) using Gemini Vision OCR
+1. Extracts **8 soil nutrients** (pH, N, P, K, OC, Zn, S, Fe) using **Groq Llama 3.2 Vision** (with Gemini fallback) and Tesseract OCR
 2. Runs them through a **rule-based advisory engine**
 3. Returns **crop-specific fertilizer recommendations** in Hindi or English
 4. Shows **cost estimates** and a **crop calendar** with weekly tasks
@@ -60,7 +61,7 @@ FPO (Farmer Producer Organisation) managers get a **web dashboard** showing soil
 - Role support: `farmer` / `fpo_manager`
 
 ### 📸 Soil Analysis
-- **Camera OCR** — scan ICAR Soil Health Card photo → Gemini Vision extracts nutrients
+- **Camera OCR** — scan ICAR Soil Health Card photo → **Groq Llama 3.2 Vision** instantly extracts nutrients (fallback to Gemini/Tesseract)
 - **Manual Entry** — type soil values directly
 - Supports **8 parameters**: pH, Nitrogen, Phosphorus, Potassium, Organic Carbon, Zinc, Sulfur, Iron
 
@@ -92,7 +93,11 @@ FPO (Farmer Producer Organisation) managers get a **web dashboard** showing soil
 - Firebase Cloud Messaging (FCM) infrastructure
 - Daily **8AM IST** cron job sends crop reminders
 - **🌈 Severity-Coded Soil Alerts**: Bottom-sheet panel displays colored notification cards matching alert urgency (Red = Critical, Orange = Warning, Amber = pH Alert, Green = Tip) with high-end left-accent indicator bars.
-- **🌧️ Dynamic Weather-Triggered Sowing Advisories**: Automatically checks local live forecasts from the Open-Meteo API. If upcoming rain is expected, it dynamically injects an actionable advice card telling farmers to broadcast nitrogen/urea now to maximize rain root absorption.
+
+### 🌦️ Dynamic Weather Forecast Integration
+- **Live 5-Day Forecasts**: Fetches real-time localized weather data using the **Open-Meteo API** based on the farmer's district.
+- **Dynamic Weather-Triggered Sowing Advisories**: Automatically checks local live forecasts. If upcoming rain is expected, it dynamically injects an actionable advice card telling farmers to broadcast nitrogen/urea now to maximize rain root absorption.
+- **Audio Weather Updates**: Uses Text-to-Speech (TTS) to read the 5-day weather summary out loud to the farmer in Hindi or English.
 
 ---
 
@@ -143,7 +148,7 @@ POST /auth/save-fcm-token { fcm_token }              → saves device token
 ```
 POST /advisory/manual    { crop, ph, nitrogen, ... } → returns advisory
 POST /advisory/ocr       { crop, ph, nitrogen, ... } → same, OCR input
-POST /advisory/ocr-scan  { image_base64 }            → extracts soil values
+POST /advisory/ocr-scan  { image_base64 }            → extracts soil values using Groq Vision
 GET  /advisory/:id                                   → fetch past advisory
 ```
 
@@ -272,7 +277,8 @@ Soil Health/
 | Database | PostgreSQL (Render) |
 | Web Dashboard | React + Vite |
 | Auth | JWT + 2Factor.in (Voice OTP) |
-| OCR | Google Gemini Vision API |
+| OCR | Groq Llama 3.2 Vision + Gemini API |
+| Weather | Open-Meteo API |
 | Push Notifications | Firebase Cloud Messaging |
 | Translations | i18next (Hindi + English) |
 | Text-to-Speech | react-native-tts |
