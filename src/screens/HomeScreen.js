@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   StatusBar,
   Animated,
   ActivityIndicator,
@@ -957,16 +958,13 @@ const getSeverityTextColor = (severity) => {
         transparent={true}
         onRequestClose={() => setShowProfileModal(false)}
       >
-        <TouchableOpacity
-          style={styles.notifOverlay}
-          activeOpacity={1}
-          onPress={() => setShowProfileModal(false)}
-        >
-          <TouchableOpacity
-            style={styles.notifSheet}
-            activeOpacity={1}
-            onPress={() => {}}
-          >
+        <View style={styles.notifOverlay}>
+          {/* Background overlay click-catcher to dismiss modal */}
+          <TouchableWithoutFeedback onPress={() => setShowProfileModal(false)}>
+            <View style={StyleSheet.absoluteFillObject} />
+          </TouchableWithoutFeedback>
+
+          <View style={styles.notifSheet}>
             {/* Header */}
             <View style={styles.notifSheetHeader}>
               <Text style={styles.notifSheetTitle}>⚙️ {isHindi ? 'खाता सेटिंग्स' : 'Account Settings'}</Text>
@@ -1164,8 +1162,8 @@ const getSeverityTextColor = (severity) => {
                 </TouchableOpacity>
               </View>
             </ScrollView>
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* ── VOICE ASSISTANT MODAL (MOCK) ────────────────────────────── */}
@@ -1175,11 +1173,12 @@ const getSeverityTextColor = (severity) => {
         animationType="slide"
         onRequestClose={() => setPlayingVoice(false)}
       >
-        <TouchableOpacity 
-          style={styles.voiceOverlay} 
-          activeOpacity={1}
-          onPress={() => setPlayingVoice(false)}
-        >
+        <View style={styles.voiceOverlay}>
+          {/* Background overlay click-catcher to dismiss modal */}
+          <TouchableWithoutFeedback onPress={() => setPlayingVoice(false)}>
+            <View style={StyleSheet.absoluteFillObject} />
+          </TouchableWithoutFeedback>
+
           <View style={[styles.voiceCard, shadows.lg]}>
             <Text style={styles.voiceCardTitle}>🎙️ MittiCard Voice Assistant</Text>
             <Text style={styles.voiceCardSubtitle}>Reading out your Soil Health Advisory...</Text>
@@ -1201,7 +1200,7 @@ const getSeverityTextColor = (severity) => {
               <Text style={styles.voiceCloseText}>Stop Listening</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );
