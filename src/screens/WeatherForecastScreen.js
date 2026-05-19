@@ -11,14 +11,12 @@ import {
 } from 'react-native';
 import { colors, spacing, fontSizes, fontWeights, radius, shadows } from '../theme';
 import i18n from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { getUser } from '../services/storage';
 import api from '../services/api';
 
-const isHindi = i18n.language === 'hi';
-
 // Helper: WMO Weather code mapper
-const getWeatherInfo = (code) => {
-  const isHi = i18n.language === 'hi';
+const getWeatherInfo = (code, isHi) => {
   if (code === 0) return { emoji: '☀️', desc: isHi ? 'साफ आसमान' : 'Clear Sky' };
   if (code <= 2) return { emoji: '⛅', desc: isHi ? 'आंशिक बादल' : 'Partly Cloudy' };
   if (code === 3) return { emoji: '☁️', desc: isHi ? 'घने बादल' : 'Overcast' };
@@ -31,8 +29,7 @@ const getWeatherInfo = (code) => {
 };
 
 // Helper: Calculate sowing suitability score & advisory tips
-const calculateSowingScore = (maxTemp, rainProb, windSpeed) => {
-  const isHi = i18n.language === 'hi';
+const calculateSowingScore = (maxTemp, rainProb, windSpeed, isHi) => {
   let score = 100;
   const warnings = [];
 
@@ -95,6 +92,9 @@ const calculateSowingScore = (maxTemp, rainProb, windSpeed) => {
 };
 
 export default function WeatherForecastScreen({ navigation, route }) {
+  const { i18n } = useTranslation();
+  const isHindi = i18n.language?.startsWith('hi');
+
   const [, setUser] = useState(null);
   const [forecast, setForecast] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -152,8 +152,6 @@ export default function WeatherForecastScreen({ navigation, route }) {
           const wind = fData.daily.windspeed_10m_max[i] || 0;
           const code = fData.daily.weathercode[i];
 
-          const sowingData = calculateSowingScore(maxTemp, rainProb, wind);
-
           list.push({
             date: days[i],
             maxTemp,
@@ -161,7 +159,6 @@ export default function WeatherForecastScreen({ navigation, route }) {
             rainProb,
             windSpeed: wind,
             weatherCode: code,
-            sowing: sowingData,
           });
         }
         setForecast(list);
@@ -184,7 +181,7 @@ export default function WeatherForecastScreen({ navigation, route }) {
   };
 
   const getDayName = (dateStr) => {
-    const isHi = i18n.language === 'hi';
+    const isHi = i18n.language?.startsWith('hi');
     const date = new Date(dateStr);
     const day = date.getDay();
     const daysEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -237,8 +234,9 @@ export default function WeatherForecastScreen({ navigation, route }) {
           </Text>
 
           {forecast.map((item, index) => {
-            const wInfo = getWeatherInfo(item.weatherCode);
-            const formattedDate = new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+            const sowing = calculateSowingScore(item.maxTemp, item.rainProb, item.windSpeed, isHindi);
+            const wInfo = getWeatherInfo(item.weatherCode, isHindi);
+            const formattedDate = new Date(item.date).toLocaleDateString(isHindi ? 'hi-IN' : 'en-IN', { day: 'numeric', month: 'short' });
 
             return (
               <View key={item.date} style={[styles.forecastCard, shadows.sm]}>
@@ -251,11 +249,11 @@ export default function WeatherForecastScreen({ navigation, route }) {
                   </View>
                   
                   {/* Sowing Score Badge */}
-                  <View style={[styles.sowingBadge, { backgroundColor: item.sowing.color + '15', borderColor: item.sowing.color }]}>
-                    <Text style={[styles.sowingBadgeText, { color: item.sowing.color }]}>
-                      {isHindi ? `बुवाई स्कोर: ${item.sowing.score}` : `Sowing Score: ${item.sowing.score}`}
+                  <View style={[styles.sowingBadge, { backgroundColor: sowing.color + '15', borderColor: sowing.color }]}>
+                    <Text style={[styles.sowingBadgeText, { color: sowing.color }]}>
+                      {isHindi ? `बुवाई स्कोर: ${sowing.score}` : `Sowing Score: ${sowing.score}`}
                     </Text>
-                    <View style={[styles.statusDot, { backgroundColor: item.sowing.color }]} />
+                    <View style={[styles.statusDot, { backgroundColor: sowing.color }]} />
                   </View>
                 </View>
 
@@ -285,9 +283,9 @@ export default function WeatherForecastScreen({ navigation, route }) {
                 </View>
 
                 {/* Advisory Tip banner */}
-                <View style={[styles.advisoryTipBox, { backgroundColor: item.sowing.color + '0C' }]}>
+                <View style={[styles.advisoryTipBox, { backgroundColor: sowing.color + '0C' }]}>
                   <Text style={[styles.advisoryTipText, { color: colors.textPrimary }]}>
-                    💡 <Text style={{ fontWeight: fontWeights.bold }}>{item.sowing.statusText}:</Text> {item.sowing.tip}
+                    💡 <Text style={{ fontWeight: fontWeights.bold }}>{sowing.statusText}:</Text> {sowing.tip}
                   </Text>
                 </View>
 

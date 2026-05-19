@@ -888,17 +888,6 @@ const getSeverityTextColor = (severity) => {
             </TouchableOpacity>
           )}
 
-          {/* ── BRAND-CONSISTENT TIP CARD ──────────────────────────────────── */}
-          <View style={styles.tipCard}>
-            <Text style={styles.tipIcon}>💡</Text>
-            <View style={styles.tipTextBlock}>
-              <Text style={styles.tipTitle}>MittiCard Pro Tip</Text>
-              <Text style={styles.tipBody}>
-                Soil with pH between 6.0–7.5 gives the best crop yield. Test your soil every season for best results.
-              </Text>
-            </View>
-          </View>
-
           {/* ── AGRI SERVICES GRID ─────────────────────────────────────────── */}
           <View style={{ marginTop: spacing.lg, marginBottom: spacing.xs }}>
             <Text style={styles.sectionTitle}>
@@ -932,6 +921,17 @@ const getSeverityTextColor = (severity) => {
                 {isHindi ? 'छत्तीसगढ़ सरकारी दरें' : 'Fertilizer & Seeds'}
               </Text>
             </TouchableOpacity>
+          </View>
+
+          {/* ── BRAND-CONSISTENT TIP CARD ──────────────────────────────────── */}
+          <View style={[styles.tipCard, { marginTop: spacing.lg, marginBottom: spacing.md }]}>
+            <Text style={styles.tipIcon}>💡</Text>
+            <View style={styles.tipTextBlock}>
+              <Text style={styles.tipTitle}>MittiCard Pro Tip</Text>
+              <Text style={styles.tipBody}>
+                Soil with pH between 6.0–7.5 gives the best crop yield. Test your soil every season for best results.
+              </Text>
+            </View>
           </View>
 
           {/* ── ERROR STATE ──────────────────────────────────────────────── */}
