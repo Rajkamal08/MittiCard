@@ -1,9 +1,4 @@
-[ignoring loop detection]
-
-I apologize for the confusion! I updated the `README.md` file locally and pushed it, but if you'd like to just copy and paste it yourself to be absolutely sure, here is the exact Markdown text reflecting the entire project (including the new React Dashboard we just built):
-
-```markdown
-# 🌱 MittiCard — Soil Health Advisory App
+🌱 MittiCard — Soil Health Advisory App
 
 > **AI-powered soil health advisory for Indian farmers, built for ICAR Soil Health Cards**
 
