@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MittiCard FPO Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:     #2D6A4F;
+      --primary-dk:  #1B4332;
+      --primary-lt:  #52B788;
+      --accent:      #F4A261;
+      --danger:      #E63946;
+      --warn:        #F4A261;
+      --good:        #40916C;
+      --bg:          #F8FAF9;
+      --surface:     #FFFFFF;
+      --border:      #E2EBE7;
+      --text:        #1B2E25;
+      --muted:       #6B8F7A;
+      --radius:      14px;
+      --shadow:      0 2px 16px rgba(0,0,0,0.08);
+    }
+
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, var(--primary-dk) 0%, var(--primary) 100%);
+      padding: 24px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .header-logo { font-size: 32px; }
+    .header-title { color: #fff; font-size: 22px; font-weight: 800; }
+    .header-sub { color: rgba(255,255,255,0.7); font-size: 13px; margin-top: 2px; }
+    .header-badge {
+      background: rgba(255,255,255,0.15); color: #fff;
+      padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    }
+    .login-form {
+      display: flex; gap: 10px; align-items: center;
+    }
+    .login-form input {
+      padding: 8px 14px; border-radius: 8px; border: none;
+      font-size: 14px; width: 140px; background: rgba(255,255,255,0.15);
+      color: #fff; outline: none;
+    }
+    .login-form input::placeholder { color: rgba(255,255,255,0.6); }
+    .btn {
+      padding: 8px 18px; border-radius: 8px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s;
+    }
+    .btn-white { background: #fff; color: var(--primary); }
+    .btn-white:hover { background: #f0f7f4; }
+    .btn-primary { background: var(--primary-lt); color: #fff; }
+    .btn-primary:hover { background: var(--good); }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-accent:hover { opacity: 0.9; }
+
+    /* ── Main ── */
+    .main { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+
+    /* ── Stat cards ── */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--surface); border-radius: var(--radius);
+      padding: 20px; box-shadow: var(--shadow); border: 1px solid var(--border);
+      display: flex; align-items: center; gap: 14px; transition: transform 0.2s;
+    }
+    .stat-card:hover { transform: translateY(-2px); }
+    .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .stat-icon.green  { background: #D8F3DC; }
+    .stat-icon.blue   { background: #DBE4F0; }
+    .stat-icon.orange { background: #FFF3E0; }
+    .stat-icon.red    { background: #FFE5E5; }
+    .stat-value { font-size: 26px; font-weight: 800; color: var(--text); }
+    .stat-label { font-size: 12px; color: var(--muted); font-weight: 500; margin-top: 2px; }
+
+    /* ── Section header ── */
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .section-title { font-size: 18px; font-weight: 700; color: var(--text); }
+
+    /* ── Alert bar ── */
+    .alert-bar {
+      background: #FFF3CD; border: 1px solid #FFD166; border-radius: var(--radius);
+      padding: 14px 18px; display: flex; gap: 10px; align-items: flex-start;
+      margin-bottom: 28px;
+    }
+    .alert-bar.hidden { display: none; }
+
+    /* ── Deficiency chart ── */
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+    .card { background: var(--surface); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+    .deficiency-list { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+    .def-row { display: flex; align-items: center; gap: 10px; }
+    .def-label { font-size: 13px; width: 130px; flex-shrink: 0; color: var(--text); font-weight: 500; }
+    .def-bar-bg { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+    .def-bar { height: 100%; border-radius: 5px; transition: width 0.8s ease; }
+    .def-pct { font-size: 12px; font-weight: 700; width: 36px; text-align: right; }
+
+    /* ── Crop distribution ── */
+    .crop-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .crop-chip {
+      padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;
+      background: #D8F3DC; color: var(--primary-dk);
+    }
+
+    /* ── Farm table ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: var(--bg); color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; padding: 12px 14px; text-align: left; border-bottom: 2px solid var(--border); }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:hover td { background: #F0F7F4; }
+    .score-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+    .score-good { background: #D8F3DC; color: var(--good); }
+    .score-mid  { background: #FFF3E0; color: #B45309; }
+    .score-bad  { background: #FFE5E5; color: var(--danger); }
+    .pill { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #E2EBE7; color: var(--muted); }
+
+    /* ── Login overlay ── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center; z-index: 100;
+    }
+    .login-card {
+      background: var(--surface); border-radius: 20px; padding: 36px; width: 380px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .login-card h2 { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+    .login-card p { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .field { margin-bottom: 16px; }
+    .field label { font-size: 13px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 6px; }
+    .field input {
+      width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: 14px; color: var(--text); outline: none; transition: border-color 0.2s;
+    }
+    .field input:focus { border-color: var(--primary); }
+    .login-btn { width: 100%; padding: 13px; background: var(--primary); color: #fff; font-size: 15px; font-weight: 700; border: none; border-radius: 10px; cursor: pointer; margin-top: 8px; transition: 0.2s; }
+    .login-btn:hover { background: var(--primary-dk); }
+    .otp-hint { text-align: center; font-size: 13px; color: var(--muted); margin-top: 12px; }
+    .otp-hint span { color: var(--primary); font-weight: 700; }
+
+    /* ── Loading ── */
+    .loading { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error ── */
+    .error-box { text-align: center; padding: 40px; color: var(--danger); }
+
+    /* ── Export row ── */
+    .export-row { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 16px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .charts-row { grid-template-columns: 1fr; }
+      .header { flex-direction: column; gap: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Login Overlay (shown until logged in) ─────────────────────────── -->
+<div class="overlay" id="loginOverlay">
+  <div class="login-card">
+    <div style="font-size:36px;text-align:center;margin-bottom:12px">🌱</div>
+    <h2 style="text-align:center">FPO Dashboard</h2>
+    <p style="text-align:center">MittiCard — Soil Health Management</p>
+
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="loginUsername" placeholder="Enter FPO username" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="Enter password" />
+    </div>
+
+    <button class="login-btn" id="loginBtn" onclick="handleLogin()">Login to Dashboard →</button>
+    <p id="loginError" style="color:var(--danger);font-size:13px;text-align:center;margin-top:8px;display:none"></p>
+    
+    <div style="margin-top:20px; padding:12px; background:#f0f7f4; border-radius:10px; font-size:12px; color:var(--primary-dk)">
+      <strong>Note:</strong> Admin must create your FPO account and set your credentials in the <a href="/admin" style="color:var(--primary); font-weight:700">Super Admin Panel</a>.
+    </div>
+  </div>
+</div>
+
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">🌾</div>
+    <div>
+      <div class="header-title">MittiCard FPO Dashboard</div>
+      <div class="header-sub">Soil Health Management for Farmer Producer Organisations</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="header-badge" id="fpoName">Loading...</div>
+    <button class="btn btn-primary" onclick="openAddFarmers()">+ Add Farmers</button>
+    <button class="btn btn-white" onclick="logout()">Logout</button>
+  </div>
+</div>
+
+<!-- ── Main ───────────────────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- Alert bar (shown when >50% farms have a deficiency) -->
+  <div class="alert-bar hidden" id="alertBar">
+    ⚠️ <strong id="alertText"></strong>
+  </div>
+
+  <!-- Loading state -->
+  <div class="loading" id="loadingState">
+    <div class="spinner"></div>
+    <div>Loading dashboard data...</div>
+  </div>
+
+  <!-- Dashboard content (hidden until data loads) -->
+  <div id="dashContent" style="display:none">
+
+    <!-- ── Stat Cards ─────────────────────────────────────────────── -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon green">🌾</div>
+        <div>
+          <div class="stat-value" id="statFarms">0</div>
+          <div class="stat-label">Total Farms</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon blue">📊</div>
+        <div>
+          <div class="stat-value" id="statScore">—</div>
+          <div class="stat-label">Avg Soil Health Score</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon orange">⚠️</div>
+        <div>
+          <div class="stat-value" id="statDeficient">0</div>
+          <div class="stat-label">Farms Needing Attention</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">🌱</div>
+        <div>
+          <div class="stat-value" id="statCrops">0</div>
+          <div class="stat-label">Crop Types</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Charts Row ─────────────────────────────────────────────── -->
+    <div class="charts-row">
+      <!-- Deficiency Breakdown -->
+      <div class="card">
+        <div class="section-title">⚗️ Nutrient Deficiency Breakdown</div>
+        <div class="deficiency-list" id="defList">
+          <!-- filled by JS -->
+        </div>
+      </div>
+
+      <!-- Crop Distribution -->
+      <div class="card">
+        <div class="section-title">🌾 Crop Distribution</div>
+        <div class="crop-chips" id="cropChips">
+          <!-- filled by JS -->
+        </div>
+        <div style="margin-top:24px">
+          <div class="section-title" style="font-size:15px">📍 District Map</div>
+          <div id="distMap" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+            <!-- filled by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Farm Table ──────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="section-header">
+        <div class="section-title">🗂️ Farm Overview</div>
+        <div class="export-row">
+          <button class="btn btn-accent" onclick="exportCSV()">⬇️ Export CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Farmer</th>
+              <th>Farm / Location</th>
+              <th>Crop</th>
+              <th>pH</th>
+              <th>N</th>
+              <th>P</th>
+              <th>K</th>
+              <th>OC%</th>
+              <th>Score</th>
+              <th>Last Scan</th>
+            </tr>
+          </thead>
+          <tbody id="farmTable">
+            <!-- filled by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- end dashContent -->
+</div>
+
+<!-- ── Add Farmers Modal ──────────────────────────────────────────────── -->
+<div class="overlay" id="addFarmersModal" style="display:none">
+  <div style="background:#fff;border-radius:20px;padding:32px;width:520px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <h2 style="font-size:20px;font-weight:800;color:var(--text)">Add Farmers to Dashboard</h2>
+        <p style="font-size:13px;color:var(--muted);margin-top:4px">Farmers in your district who have used MittiCard</p>
+      </div>
+      <button onclick="closeAddFarmers()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">✕</button>
+    </div>
+    <div id="districtFarmsList">
+      <div class="loading"><div class="spinner"></div>Loading farmers...</div>
+    </div>
+    <button class="btn btn-primary" onclick="closeAddFarmers()" style="width:100%;margin-top:16px;padding:12px;font-size:15px">Done</button>
+  </div>
+</div>
+
+<script>
+  const API = 'https://mitticard-backend.onrender.com';
+  let authToken = localStorage.getItem('fpo_token');
+  let loginStep = 'phone'; // 'phone' | 'otp'
+  let sentPhone = '';
+
+  // ── On page load ─────────────────────────────────────────────────────────
+  window.onload = () => {
+    if (authToken) {
+      document.getElementById('loginOverlay').style.display = 'none';
+      loadDashboard();
+    }
+  };
+
+  // ── Login flow ───────────────────────────────────────────────────────────
+  async function handleLogin() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const btn      = document.getElementById('loginBtn');
+
+    if (!username || !password) {
+      showLoginError('Please enter both username and password');
+      return;
+    }
+
+    btn.textContent = 'Logging in...';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(`${API}/auth/fpo-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        authToken = data.token;
+        localStorage.setItem('fpo_token', authToken);
+        document.getElementById('loginOverlay').style.display = 'none';
+        loadDashboard();
+      } else {
+        showLoginError(data.message || 'Invalid credentials');
+        btn.textContent = 'Login to Dashboard →';
+        btn.disabled = false;
+      }
+    } catch (err) {
+      showLoginError('Server error. Is backend awake?');
+      btn.textContent = 'Login to Dashboard →';
+      btn.disabled = false;
+    }
+  }
+
+  function showLoginError(msg) {
+    const el = document.getElementById('loginError');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function logout() {
+    localStorage.removeItem('fpo_token');
+    location.reload();
+  }
+
+  // ── Load dashboard data ──────────────────────────────────────────────────
+  async function loadDashboard() {
+    const headers = { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' };
+
+    try {
+      const [farmsRes, statsRes] = await Promise.all([
+        fetch(`${API}/fpo/farms`,  { headers }),
+        fetch(`${API}/fpo/stats`,  { headers }),
+      ]);
+
+      const farmsData = await farmsRes.json();
+      const statsData = await statsRes.json();
+
+      if (!farmsRes.ok || !farmsData.success) throw new Error('Auth failed — please login again');
+
+      renderDashboard(farmsData, statsData);
+    } catch (err) {
+      if (err.message.includes('Auth')) { logout(); return; }
+      document.getElementById('loadingState').innerHTML =
+        `<div class="error-box">❌ ${err.message}<br><br><button class="btn btn-primary" onclick="loadDashboard()">Retry</button></div>`;
+    }
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  function renderDashboard(farmsData, statsData) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('dashContent').style.display = 'block';
+
+    const farms = farmsData.farms || [];
+    const stats = statsData;
+
+    // Header badge
+    document.getElementById('fpoName').textContent = `FPO Manager · ${farms.length} Farms`;
+
+    // Stat cards
+    document.getElementById('statFarms').textContent = farms.length;
+    document.getElementById('statScore').textContent = stats.average_soil_health_score ?? '—';
+    document.getElementById('statCrops').textContent  = Object.keys(stats.crop_distribution || {}).length;
+
+    const deficient = farms.filter(f => (f.soil_health_score || 0) < 50).length;
+    document.getElementById('statDeficient').textContent = deficient;
+
+    // Alert bar
+    if (stats.deficiency_breakdown) {
+      const worst = Object.entries(stats.deficiency_breakdown)
+        .sort((a, b) => parseInt(b[1].percentage) - parseInt(a[1].percentage))[0];
+      if (worst && parseInt(worst[1].percentage) > 50) {
+        document.getElementById('alertText').textContent =
+          `${worst[1].percentage} of farms have low ${worst[0].replace(/_/g, ' ')} — consider bulk intervention`;
+        document.getElementById('alertBar').classList.remove('hidden');
+      }
+    }
+
+    // Deficiency bars
+    const DEF_COLORS = { nitrogen: '#52B788', phosphorus: '#F4A261', potassium: '#4ECDC4',
+      organic_carbon: '#A8DADC', zinc: '#E63946', sulfur: '#FFD166', iron: '#6A994E' };
+    const defList = Object.entries(stats.deficiency_breakdown || {});
+    document.getElementById('defList').innerHTML = defList.map(([key, val]) => {
+      const pct = parseInt(val.percentage);
+      const color = pct > 60 ? '#E63946' : pct > 30 ? '#F4A261' : '#40916C';
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).replace(' Low', '').replace(' Deficient', '');
+      return `<div class="def-row">
+        <div class="def-label">${label}</div>
+        <div class="def-bar-bg"><div class="def-bar" style="width:${pct}%;background:${color}"></div></div>
+        <div class="def-pct" style="color:${color}">${val.percentage}</div>
+      </div>`;
+    }).join('');
+
+    // Crop chips
+    const crops = stats.crop_distribution || {};
+    document.getElementById('cropChips').innerHTML = Object.entries(crops)
+      .map(([c, n]) => `<div class="crop-chip">${getCropEmoji(c)} ${c.charAt(0).toUpperCase()+c.slice(1)} <strong>${n}</strong></div>`).join('');
+
+    // District map chips
+    const districts = [...new Set(farms.map(f => f.district).filter(Boolean))];
+    document.getElementById('distMap').innerHTML = districts
+      .map(d => `<div class="crop-chip" style="background:#E8F0FE;color:#1A56DB">📍 ${d}</div>`).join('');
+
+    // Farm table
+    document.getElementById('farmTable').innerHTML = farms.map(f => {
+      const score = f.soil_health_score;
+      const cls = score >= 70 ? 'score-good' : score >= 40 ? 'score-mid' : 'score-bad';
+      const scoreHtml = score ? `<span class="score-badge ${cls}">${score}/100</span>` : '<span style="color:var(--muted)">—</span>';
+      const val = v => (v !== null && v !== undefined) ? Number(v).toFixed(1) : '<span style="color:var(--muted)">—</span>';
+      const date = f.scanned_at ? new Date(f.scanned_at).toLocaleDateString('en-IN', { day:'numeric', month:'short' }) : '<span style="color:var(--muted)">Not scanned</span>';
+      return `<tr>
+        <td><strong>${f.farmer_name || '—'}</strong><br><span style="color:var(--muted);font-size:11px">${f.farmer_phone || ''}</span></td>
+        <td>${f.farm_name || '—'}<br><span class="pill">${f.district || '—'}, ${f.state || '—'}</span></td>
+        <td>${f.crop ? `${getCropEmoji(f.crop)} ${f.crop}` : '—'}</td>
+        <td>${val(f.ph)}</td>
+        <td>${val(f.nitrogen)}</td>
+        <td>${val(f.phosphorus)}</td>
+        <td>${val(f.potassium)}</td>
+        <td>${val(f.organic_carbon)}</td>
+        <td>${scoreHtml}</td>
+        <td style="white-space:nowrap">${date}</td>
+      </tr>`;
+    }).join('');
+
+    if (farms.length === 0) {
+      document.getElementById('farmTable').innerHTML =
+        `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--muted)">No farms linked to this FPO yet.<br>Farmers register by scanning their soil card.</td></tr>`;
+    }
+  }
+
+  function getCropEmoji(crop) {
+    const map = { wheat:'🌾', rice:'🍚', maize:'🌽', cotton:'🌿', sugarcane:'🎋', soybean:'🫛', groundnut:'🥜', pulses:'🫘' };
+    return map[crop?.toLowerCase()] || '🌱';
+  }
+
+  // ── Export CSV ───────────────────────────────────────────────────────────
+  async function exportCSV() {
+    const a = document.createElement('a');
+    a.href = `${API}/fpo/export`;
+    // Pass auth token as query param for direct download
+    const res = await fetch(`${API}/fpo/export`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+    const blob = await res.blob();
+    a.href = URL.createObjectURL(blob);
+    a.download = `FPO_Report_${new Date().toLocaleDateString('en-IN').replace(/\//g,'-')}.csv`;
+    a.click();
+  }
+
+  // ── Add Farmers Modal ────────────────────────────────────────────────────
+  function openAddFarmers() {
+    document.getElementById('addFarmersModal').style.display = 'flex';
+    loadDistrictFarms();
+  }
+
+  function closeAddFarmers() {
+    document.getElementById('addFarmersModal').style.display = 'none';
+    loadDashboard(); // refresh dashboard after adding
+  }
+
+  async function loadDistrictFarms() {
+    const el = document.getElementById('districtFarmsList');
+    el.innerHTML = '<div class="loading"><div class="spinner"></div>Loading farmers...</div>';
+    try {
+      const res = await fetch(`${API}/fpo/district-farms`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const data = await res.json();
+      const farms = data.farms || [];
+
+      if (farms.length === 0) {
+        el.innerHTML = `<div style="text-align:center;padding:32px;color:var(--muted)">
+          <div style="font-size:40px;margin-bottom:12px">🌾</div>
+          <strong>No farmers found yet</strong><br>
+          <span style="font-size:13px">When farmers in your district scan their soil card, they'll appear here.</span>
+        </div>`;
+        return;
+      }
+
+      el.innerHTML = farms.map(f => `
+        <div id="farm-row-${f.farm_id}" style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1">
+            <div style="font-weight:700;color:var(--text)">${f.farmer_name || '—'}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">${f.farmer_phone} · ${f.farm_name}</div>
+            ${f.district ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">📍 ${f.district}</div>` : ''}
+          </div>
+          <button
+            id="add-btn-${f.farm_id}"
+            onclick="addFarmer('${f.farm_id}', this)"
+            style="padding:8px 18px;border-radius:20px;border:none;font-size:13px;font-weight:600;cursor:pointer;
+              background:${f.already_added ? '#D8F3DC' : 'var(--primary)'};
+              color:${f.already_added ? 'var(--good)' : '#fff'}"
+            ${f.already_added ? 'disabled' : ''}
+          >${f.already_added ? '✓ Added' : '+ Add'}</button>
+        </div>
+      `).join('');
+    } catch (e) {
+      el.innerHTML = `<div class="error-box">❌ Could not load farmers. ${e.message}</div>`;
+    }
+  }
+
+  async function addFarmer(farm_id, btn) {
+    btn.textContent = 'Adding...';
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${API}/fpo/members`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ farm_id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        btn.textContent = '✓ Added';
+        btn.style.background = '#D8F3DC';
+        btn.style.color = 'var(--good)';
+      } else {
+        btn.textContent = '+ Add';
+        btn.disabled = false;
+        alert(data.message || 'Could not add farmer');
+      }
+    } catch {
+      btn.textContent = '+ Add';
+      btn.disabled = false;
+      alert('Network error. Try again.');
+    }
+  }
+
+  // Allow Enter key on login
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.getElementById('loginOverlay').style.display !== 'none') handleLogin();
+  });
+</script>
+</body>
+</html>

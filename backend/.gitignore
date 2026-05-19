@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Environment variables — contains DB password and JWT secret
+.env
+
+# Firebase private key — NEVER commit this
+firebase-service-account.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,210 @@
+{
+  "_note": "NPK thresholds based on general ICAR guidelines (ICAR, 2017). Crop-specific refinement planned for v2.",
+  "_priority_guide": "Priority 1=critical (buy first), 2=important, 3=can delay if budget tight, 4=micronutrient, 5=trace",
+  "crops": {
+    "wheat": {
+      "ph": { "min": 6.0, "max": 7.5 },
+      "nitrogen":       { "low": 140, "medium": 280 },
+      "phosphorus":     { "low": 11,  "medium": 22  },
+      "potassium":      { "low": 108, "medium": 280 },
+      "organic_carbon": { "low": 0.5, "medium": 0.75 },
+      "zinc":   { "deficient": 0.6  },
+      "sulfur": { "deficient": 10   },
+      "iron":   { "deficient": 4.5  },
+      "fertilizers": {
+        "nitrogen_low":      { "name": "Urea",            "qty_kg_per_acre": 55, "bag_size_kg": 50, "price_per_bag": 266,  "priority": 1 },
+        "nitrogen_medium":   { "name": "Urea",            "qty_kg_per_acre": 27, "bag_size_kg": 50, "price_per_bag": 266,  "priority": 1 },
+        "phosphorus_low":    { "name": "DAP",             "qty_kg_per_acre": 40, "bag_size_kg": 50, "price_per_bag": 1350, "priority": 2 },
+        "phosphorus_medium": { "name": "SSP",             "qty_kg_per_acre": 30, "bag_size_kg": 50, "price_per_bag": 400,  "priority": 2 },
+        "potassium_low":     { "name": "MOP",             "qty_kg_per_acre": 27, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "potassium_medium":  { "name": "MOP",             "qty_kg_per_acre": 13, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "zinc_deficient":    { "name": "Zinc Sulfate",    "qty_kg_per_acre": 10, "bag_size_kg": 25, "price_per_bag": 900,  "priority": 4 },
+        "sulfur_deficient":  { "name": "Gypsum",          "qty_kg_per_acre": 20, "bag_size_kg": 50, "price_per_bag": 200,  "priority": 4 },
+        "iron_deficient":    { "name": "Ferrous Sulfate", "qty_kg_per_acre": 5,  "bag_size_kg": 25, "price_per_bag": 600,  "priority": 5 }
+      },
+      "calendar": [
+        { "days_after_sowing": 0,   "label": "Land preparation + basal fertilizer application" },
+        { "days_after_sowing": 21,  "label": "First irrigation — apply top dress Urea" },
+        { "days_after_sowing": 45,  "label": "Second irrigation — monitor for pests" },
+        { "days_after_sowing": 65,  "label": "Flowering stage — no irrigation stress" },
+        { "days_after_sowing": 110, "label": "Harvest ready — check grain moisture" }
+      ]
+    },
+
+    "rice": {
+      "ph": { "min": 5.5, "max": 7.0 },
+      "nitrogen":       { "low": 140, "medium": 280 },
+      "phosphorus":     { "low": 11,  "medium": 22  },
+      "potassium":      { "low": 108, "medium": 280 },
+      "organic_carbon": { "low": 0.5, "medium": 0.75 },
+      "zinc":   { "deficient": 0.6  },
+      "sulfur": { "deficient": 10   },
+      "iron":   { "deficient": 4.5  },
+      "fertilizers": {
+        "nitrogen_low":      { "name": "Urea",            "qty_kg_per_acre": 60, "bag_size_kg": 50, "price_per_bag": 266,  "priority": 1 },
+        "nitrogen_medium":   { "name": "Urea",            "qty_kg_per_acre": 30, "bag_size_kg": 50, "price_per_bag": 266,  "priority": 1 },
+        "phosphorus_low":    { "name": "DAP",             "qty_kg_per_acre": 35, "bag_size_kg": 50, "price_per_bag": 1350, "priority": 2 },
+        "phosphorus_medium": { "name": "SSP",             "qty_kg_per_acre": 25, "bag_size_kg": 50, "price_per_bag": 400,  "priority": 2 },
+        "potassium_low":     { "name": "MOP",             "qty_kg_per_acre": 25, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "potassium_medium":  { "name": "MOP",             "qty_kg_per_acre": 12, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "zinc_deficient":    { "name": "Zinc Sulfate",    "qty_kg_per_acre": 12, "bag_size_kg": 25, "price_per_bag": 900,  "priority": 4 },
+        "sulfur_deficient":  { "name": "Gypsum",          "qty_kg_per_acre": 20, "bag_size_kg": 50, "price_per_bag": 200,  "priority": 4 },
+        "iron_deficient":    { "name": "Ferrous Sulfate", "qty_kg_per_acre": 5,  "bag_size_kg": 25, "price_per_bag": 600,  "priority": 5 }
+      },
+      "calendar": [
+        { "days_after_sowing": 0,   "label": "Nursery preparation + seed treatment" },
+        { "days_after_sowing": 25,  "label": "Transplanting — apply basal fertilizer" },
+        { "days_after_sowing": 40,  "label": "First top dressing — Urea application" },
+        { "days_after_sowing": 65,  "label": "Panicle initiation — second top dressing" },
+        { "days_after_sowing": 120, "label": "Harvest — drain field 10 days before" }
+      ]
+    },
+
+    "maize": {
+      "ph": { "min": 5.8, "max": 7.0 },
+      "nitrogen":       { "low": 140, "medium": 280 },
+      "phosphorus":     { "low": 11,  "medium": 22  },
+      "potassium":      { "low": 108, "medium": 280 },
+      "organic_carbon": { "low": 0.5, "medium": 0.75 },
+      "zinc":   { "deficient": 0.6  },
+      "sulfur": { "deficient": 10   },
+      "iron":   { "deficient": 4.5  },
+      "fertilizers": {
+        "nitrogen_low":      { "name": "Urea",            "qty_kg_per_acre": 65, "bag_size_kg": 50, "price_per_bag": 266,  "priority": 1 },
+        "nitrogen_medium":   { "name": "Urea",            "qty_kg_per_acre": 32, "bag_size_kg": 50, "price_per_bag": 266,  "priority": 1 },
+        "phosphorus_low":    { "name": "DAP",             "qty_kg_per_acre": 35, "bag_size_kg": 50, "price_per_bag": 1350, "priority": 2 },
+        "phosphorus_medium": { "name": "SSP",             "qty_kg_per_acre": 25, "bag_size_kg": 50, "price_per_bag": 400,  "priority": 2 },
+        "potassium_low":     { "name": "MOP",             "qty_kg_per_acre": 27, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "potassium_medium":  { "name": "MOP",             "qty_kg_per_acre": 13, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "zinc_deficient":    { "name": "Zinc Sulfate",    "qty_kg_per_acre": 10, "bag_size_kg": 25, "price_per_bag": 900,  "priority": 4 },
+        "sulfur_deficient":  { "name": "Gypsum",          "qty_kg_per_acre": 20, "bag_size_kg": 50, "price_per_bag": 200,  "priority": 4 },
+        "iron_deficient":    { "name": "Ferrous Sulfate", "qty_kg_per_acre": 5,  "bag_size_kg": 25, "price_per_bag": 600,  "priority": 5 }
+      },
+      "calendar": [
+        { "days_after_sowing": 0,  "label": "Land prep + basal dose (DAP + MOP)" },
+        { "days_after_sowing": 20, "label": "First top dressing — Urea" },
+        { "days_after_sowing": 40, "label": "Knee high stage — second top dressing" },
+        { "days_after_sowing": 60, "label": "Tasselling — critical irrigation stage" },
+        { "days_after_sowing": 95, "label": "Physiological maturity — ready to harvest" }
+      ]
+    },
+
+    "cotton": {
+      "ph": { "min": 6.0, "max": 7.5 },
+      "nitrogen":       { "low": 140, "medium": 280 },
+      "phosphorus":     { "low": 11,  "medium": 22  },
+      "potassium":      { "low": 150, "medium": 300 },
+      "organic_carbon": { "low": 0.5, "medium": 0.75 },
+      "zinc":   { "deficient": 0.6  },
+      "sulfur": { "deficient": 10   },
+      "iron":   { "deficient": 4.5  },
+      "fertilizers": {
+        "nitrogen_low":      { "name": "Urea",            "qty_kg_per_acre": 50, "bag_size_kg": 50, "price_per_bag": 266,  "priority": 1 },
+        "nitrogen_medium":   { "name": "Urea",            "qty_kg_per_acre": 25, "bag_size_kg": 50, "price_per_bag": 266,  "priority": 1 },
+        "phosphorus_low":    { "name": "DAP",             "qty_kg_per_acre": 35, "bag_size_kg": 50, "price_per_bag": 1350, "priority": 2 },
+        "phosphorus_medium": { "name": "SSP",             "qty_kg_per_acre": 25, "bag_size_kg": 50, "price_per_bag": 400,  "priority": 2 },
+        "potassium_low":     { "name": "MOP",             "qty_kg_per_acre": 30, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "potassium_medium":  { "name": "MOP",             "qty_kg_per_acre": 15, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "zinc_deficient":    { "name": "Zinc Sulfate",    "qty_kg_per_acre": 10, "bag_size_kg": 25, "price_per_bag": 900,  "priority": 4 },
+        "sulfur_deficient":  { "name": "Gypsum",          "qty_kg_per_acre": 25, "bag_size_kg": 50, "price_per_bag": 200,  "priority": 4 },
+        "iron_deficient":    { "name": "Ferrous Sulfate", "qty_kg_per_acre": 5,  "bag_size_kg": 25, "price_per_bag": 600,  "priority": 5 }
+      },
+      "calendar": [
+        { "days_after_sowing": 0,   "label": "Sowing + basal fertilizer" },
+        { "days_after_sowing": 30,  "label": "Thinning + first top dressing" },
+        { "days_after_sowing": 60,  "label": "Squaring stage — second top dressing" },
+        { "days_after_sowing": 90,  "label": "Boll formation — pest monitoring" },
+        { "days_after_sowing": 150, "label": "First picking of cotton bolls" }
+      ]
+    },
+
+    "sugarcane": {
+      "ph": { "min": 6.0, "max": 7.5 },
+      "nitrogen":       { "low": 140, "medium": 280 },
+      "phosphorus":     { "low": 11,  "medium": 22  },
+      "potassium":      { "low": 140, "medium": 280 },
+      "organic_carbon": { "low": 0.5, "medium": 0.75 },
+      "zinc":   { "deficient": 0.6  },
+      "sulfur": { "deficient": 10   },
+      "iron":   { "deficient": 4.5  },
+      "fertilizers": {
+        "nitrogen_low":      { "name": "Urea",            "qty_kg_per_acre": 80, "bag_size_kg": 50, "price_per_bag": 266,  "priority": 1 },
+        "nitrogen_medium":   { "name": "Urea",            "qty_kg_per_acre": 40, "bag_size_kg": 50, "price_per_bag": 266,  "priority": 1 },
+        "phosphorus_low":    { "name": "DAP",             "qty_kg_per_acre": 40, "bag_size_kg": 50, "price_per_bag": 1350, "priority": 2 },
+        "phosphorus_medium": { "name": "SSP",             "qty_kg_per_acre": 30, "bag_size_kg": 50, "price_per_bag": 400,  "priority": 2 },
+        "potassium_low":     { "name": "MOP",             "qty_kg_per_acre": 40, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "potassium_medium":  { "name": "MOP",             "qty_kg_per_acre": 20, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "zinc_deficient":    { "name": "Zinc Sulfate",    "qty_kg_per_acre": 12, "bag_size_kg": 25, "price_per_bag": 900,  "priority": 4 },
+        "sulfur_deficient":  { "name": "Gypsum",          "qty_kg_per_acre": 20, "bag_size_kg": 50, "price_per_bag": 200,  "priority": 4 },
+        "iron_deficient":    { "name": "Ferrous Sulfate", "qty_kg_per_acre": 5,  "bag_size_kg": 25, "price_per_bag": 600,  "priority": 5 }
+      },
+      "calendar": [
+        { "days_after_sowing": 0,   "label": "Planting + basal fertilizer" },
+        { "days_after_sowing": 45,  "label": "First top dressing — Urea" },
+        { "days_after_sowing": 90,  "label": "Second top dressing — earthing up" },
+        { "days_after_sowing": 180, "label": "Formative phase — check pest incidence" },
+        { "days_after_sowing": 330, "label": "Pre-harvest — stop irrigation" }
+      ]
+    },
+
+    "soybean": {
+      "_note": "Legume crop — fixes atmospheric nitrogen via rhizobium. Only starter dose of Urea needed. Low threshold set to 20 kg/ha (not 140). Priority 3 as P and K matter more.",
+      "ph": { "min": 6.0, "max": 7.0 },
+      "nitrogen":       { "low": 20,  "medium": 40 },
+      "phosphorus":     { "low": 11,  "medium": 22  },
+      "potassium":      { "low": 108, "medium": 280 },
+      "organic_carbon": { "low": 0.5, "medium": 0.75 },
+      "zinc":   { "deficient": 0.6  },
+      "sulfur": { "deficient": 10   },
+      "iron":   { "deficient": 4.5  },
+      "fertilizers": {
+        "nitrogen_low":      { "name": "Urea",            "qty_kg_per_acre": 9,  "bag_size_kg": 50, "price_per_bag": 266,  "priority": 3 },
+        "nitrogen_medium":   { "name": "Urea",            "qty_kg_per_acre": 5,  "bag_size_kg": 50, "price_per_bag": 266,  "priority": 3 },
+        "phosphorus_low":    { "name": "DAP",             "qty_kg_per_acre": 35, "bag_size_kg": 50, "price_per_bag": 1350, "priority": 2 },
+        "phosphorus_medium": { "name": "SSP",             "qty_kg_per_acre": 25, "bag_size_kg": 50, "price_per_bag": 400,  "priority": 2 },
+        "potassium_low":     { "name": "MOP",             "qty_kg_per_acre": 20, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "potassium_medium":  { "name": "MOP",             "qty_kg_per_acre": 10, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "zinc_deficient":    { "name": "Zinc Sulfate",    "qty_kg_per_acre": 10, "bag_size_kg": 25, "price_per_bag": 900,  "priority": 4 },
+        "sulfur_deficient":  { "name": "Gypsum",          "qty_kg_per_acre": 20, "bag_size_kg": 50, "price_per_bag": 200,  "priority": 4 },
+        "iron_deficient":    { "name": "Ferrous Sulfate", "qty_kg_per_acre": 5,  "bag_size_kg": 25, "price_per_bag": 600,  "priority": 5 }
+      },
+      "calendar": [
+        { "days_after_sowing": 0,  "label": "Sowing + rhizobium seed treatment" },
+        { "days_after_sowing": 20, "label": "Thinning — maintain plant population" },
+        { "days_after_sowing": 45, "label": "Flowering — critical water requirement" },
+        { "days_after_sowing": 70, "label": "Pod filling — monitor pod borers" },
+        { "days_after_sowing": 95, "label": "Harvest when 95% pods turn brown" }
+      ]
+    },
+
+    "groundnut": {
+      "_note": "Legume crop — fixes atmospheric nitrogen via rhizobium. Nitrogen starter dose only. Low threshold set to 20 kg/ha. SSP is primary for calcium + phosphorus requirement.",
+      "ph": { "min": 6.0, "max": 7.0 },
+      "nitrogen":       { "low": 20,  "medium": 40 },
+      "phosphorus":     { "low": 11,  "medium": 22  },
+      "potassium":      { "low": 108, "medium": 280 },
+      "organic_carbon": { "low": 0.5, "medium": 0.75 },
+      "zinc":   { "deficient": 0.6  },
+      "sulfur": { "deficient": 10   },
+      "iron":   { "deficient": 4.5  },
+      "fertilizers": {
+        "nitrogen_low":      { "name": "Urea",            "qty_kg_per_acre": 8,  "bag_size_kg": 50, "price_per_bag": 266,  "priority": 3 },
+        "nitrogen_medium":   { "name": "Urea",            "qty_kg_per_acre": 4,  "bag_size_kg": 50, "price_per_bag": 266,  "priority": 3 },
+        "phosphorus_low":    { "name": "SSP",             "qty_kg_per_acre": 50, "bag_size_kg": 50, "price_per_bag": 400,  "priority": 2 },
+        "phosphorus_medium": { "name": "SSP",             "qty_kg_per_acre": 25, "bag_size_kg": 50, "price_per_bag": 400,  "priority": 2 },
+        "potassium_low":     { "name": "MOP",             "qty_kg_per_acre": 20, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "potassium_medium":  { "name": "MOP",             "qty_kg_per_acre": 10, "bag_size_kg": 50, "price_per_bag": 1700, "priority": 3 },
+        "zinc_deficient":    { "name": "Zinc Sulfate",    "qty_kg_per_acre": 10, "bag_size_kg": 25, "price_per_bag": 900,  "priority": 4 },
+        "sulfur_deficient":  { "name": "Gypsum",          "qty_kg_per_acre": 20, "bag_size_kg": 50, "price_per_bag": 200,  "priority": 4 },
+        "iron_deficient":    { "name": "Ferrous Sulfate", "qty_kg_per_acre": 5,  "bag_size_kg": 25, "price_per_bag": 600,  "priority": 5 }
+      },
+      "calendar": [
+        { "days_after_sowing": 0,  "label": "Sowing + basal dose (SSP + MOP)" },
+        { "days_after_sowing": 25, "label": "Earthing up — weed control" },
+        { "days_after_sowing": 45, "label": "Pegging stage — gypsum application" },
+        { "days_after_sowing": 75, "label": "Pod development — check leaf spot" },
+        { "days_after_sowing": 110,"label": "Harvest — test plant maturity" }
+      ]
+    }
+  }
+}

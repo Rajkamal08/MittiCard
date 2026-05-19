@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MittiCard — Super Admin Panel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary:    #2D6A4F;
+      --primary-dk: #1B4332;
+      --primary-lt: #52B788;
+      --accent:     #F4A261;
+      --danger:     #E63946;
+      --warn:       #F59E0B;
+      --good:       #40916C;
+      --bg:         #F0F4F2;
+      --surface:    #FFFFFF;
+      --border:     #E2EBE7;
+      --text:       #1B2E25;
+      --muted:      #6B8F7A;
+      --radius:     14px;
+      --shadow:     0 2px 16px rgba(0,0,0,0.08);
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── Login overlay ── */
+    .overlay { position: fixed; inset: 0; background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 100%); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .login-card { background: #fff; border-radius: 24px; padding: 44px 40px; width: 400px; box-shadow: 0 30px 80px rgba(0,0,0,0.3); }
+    .login-logo { font-size: 48px; text-align: center; margin-bottom: 8px; }
+    .login-title { font-size: 24px; font-weight: 800; color: var(--text); text-align: center; margin-bottom: 4px; }
+    .login-sub { font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 28px; }
+    .field { margin-bottom: 16px; }
+    .field label { font-size: 12px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .field input { width: 100%; padding: 13px 16px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 15px; color: var(--text); outline: none; transition: border-color 0.2s; font-family: 'Inter', sans-serif; }
+    .field input:focus { border-color: var(--primary); }
+    .login-btn { width: 100%; padding: 14px; background: var(--primary); color: #fff; font-size: 15px; font-weight: 700; border: none; border-radius: 10px; cursor: pointer; transition: 0.2s; font-family: 'Inter', sans-serif; margin-top: 8px; }
+    .login-btn:hover { background: var(--primary-dk); }
+    .login-err { color: var(--danger); font-size: 13px; text-align: center; margin-top: 10px; display: none; }
+
+    /* ── Header ── */
+    .header { background: linear-gradient(135deg, var(--primary-dk), var(--primary)); padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+    .header-title { color: #fff; font-size: 20px; font-weight: 800; }
+    .header-sub { color: rgba(255,255,255,0.65); font-size: 12px; margin-top: 2px; }
+    .admin-badge { background: rgba(244,162,97,0.3); color: #F4A261; border: 1px solid rgba(244,162,97,0.5); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+    .btn { padding: 9px 18px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: 'Inter', sans-serif; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dk); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-white-outline { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); }
+    .btn-white-outline:hover { background: rgba(255,255,255,0.25); }
+
+    /* ── Tabs ── */
+    .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); padding: 0 24px; background: var(--surface); }
+    .tab { padding: 14px 20px; font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -2px; transition: 0.15s; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* ── Main ── */
+    .main { max-width: 1100px; margin: 0 auto; padding: 28px 24px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Stats ── */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card { background: var(--surface); border-radius: var(--radius); padding: 20px 18px; box-shadow: var(--shadow); border: 1px solid var(--border); display: flex; align-items: center; gap: 14px; transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-2px); }
+    .stat-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .stat-icon.green  { background: #D8F3DC; }
+    .stat-icon.blue   { background: #DBE4F0; }
+    .stat-icon.orange { background: #FFF3E0; }
+    .stat-icon.red    { background: #FFE5E5; }
+    .stat-value { font-size: 28px; font-weight: 800; color: var(--text); }
+    .stat-label { font-size: 12px; color: var(--muted); font-weight: 500; margin-top: 2px; }
+
+    /* ── Cards ── */
+    .card { background: var(--surface); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 20px; }
+    .card-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .card-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; margin-top: -10px; }
+
+    /* ── Form rows ── */
+    .form-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+    .form-row .field { flex: 1; min-width: 160px; margin-bottom: 0; }
+    .role-select { width: 100%; padding: 13px 16px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 14px; color: var(--text); outline: none; background: #fff; font-family: 'Inter', sans-serif; cursor: pointer; }
+    .action-btn { padding: 13px 22px; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Inter', sans-serif; height: 48px; white-space: nowrap; transition: 0.2s; }
+    .action-btn.green { background: var(--primary); color: #fff; }
+    .action-btn.green:hover { background: var(--primary-dk); }
+    .action-btn.blue  { background: #1A56DB; color: #fff; }
+    .action-btn.blue:hover  { background: #1447CC; }
+
+    /* ── Result box ── */
+    .result-box { margin-top: 14px; padding: 12px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; display: none; }
+    .result-box.success { background: #D8F3DC; color: var(--good); border: 1px solid #B7E4C7; }
+    .result-box.error   { background: #FFE5E5; color: var(--danger); border: 1px solid #FFC0C0; }
+
+    /* ── Table ── */
+    .table-toolbar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .search-input, .filter-select { padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 14px; color: var(--text); outline: none; background: #fff; font-family: 'Inter', sans-serif; }
+    .search-input { flex: 1; min-width: 200px; }
+    .search-input:focus, .role-select:focus { border-color: var(--primary); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: var(--bg); color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; padding: 12px 14px; text-align: left; border-bottom: 2px solid var(--border); white-space: nowrap; }
+    td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:hover td { background: #F4F8F5; }
+    .role-pill { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+    .role-farmer { background: #E2EBE7; color: var(--muted); }
+    .role-fpo    { background: #D8F3DC; color: var(--good); }
+    .role-admin  { background: #FFF3E0; color: #B45309; }
+    .quick-btn { padding: 5px 12px; border-radius: 8px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: 0.15s; }
+    .quick-promote { background: #D8F3DC; color: var(--good); }
+    .quick-promote:hover { background: #B7E4C7; }
+    .quick-demote  { background: #FFE5E5; color: var(--danger); }
+    .quick-demote:hover  { background: #FFC0C0; }
+    .has-creds { display: inline-block; padding: 3px 8px; border-radius: 6px; background: #EEF2FF; color: #4338CA; font-size: 11px; font-weight: 700; }
+
+    /* ── FPO Managers table ── */
+    .fpo-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; background: #ECFDF5; color: var(--good); font-size: 12px; font-weight: 700; }
+
+    /* ── Loading / empty ── */
+    .loading { text-align: center; padding: 40px; color: var(--muted); }
+    .spinner { width: 36px; height: 36px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+
+    @media (max-width: 768px) {
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .header { flex-direction: column; gap: 12px; align-items: flex-start; }
+      .form-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Admin Key Login ──────────────────────────────────────────────── -->
+<div class="overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">🔑</div>
+    <h2 class="login-title">Admin Panel</h2>
+    <p class="login-sub">MittiCard — Super Admin Access Only</p>
+    <div class="field">
+      <label>Admin Secret Key</label>
+      <input type="password" id="adminKeyInput" placeholder="Enter admin key..." autocomplete="off" />
+    </div>
+    <button class="login-btn" onclick="doAdminLogin()">Enter Admin Panel →</button>
+    <p class="login-err" id="loginErr">❌ Wrong admin key. Try again.</p>
+  </div>
+</div>
+
+<!-- ── Header ──────────────────────────────────────────────────────── -->
+<div class="header">
+  <div style="display:flex;align-items:center;gap:14px">
+    <div style="font-size:28px">🌾</div>
+    <div>
+      <div class="header-title">MittiCard — Admin Panel</div>
+      <div class="header-sub">User management · FPO manager setup · Role control</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="admin-badge">🔑 SUPER ADMIN</span>
+    <button class="btn btn-white-outline" onclick="doLogout()">Logout</button>
+  </div>
+</div>
+
+<!-- ── Tabs ──────────────────────────────────────────────────────────── -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('overview')">📊 Overview</div>
+  <div class="tab" onclick="switchTab('fpo')">🏢 FPO Managers</div>
+  <div class="tab" onclick="switchTab('users')">👥 All Users</div>
+</div>
+
+<!-- ── Main ──────────────────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- ════ OVERVIEW TAB ════════════════════════════════════════════════ -->
+  <div class="tab-panel active" id="panel-overview">
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon green">👥</div>
+        <div><div class="stat-value" id="statTotal">—</div><div class="stat-label">Total Users</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon blue">🌾</div>
+        <div><div class="stat-value" id="statFarmers">—</div><div class="stat-label">Farmers</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon orange">🏢</div>
+        <div><div class="stat-value" id="statFPO">—</div><div class="stat-label">FPO Managers</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon red">🔑</div>
+        <div><div class="stat-value" id="statAdmin">—</div><div class="stat-label">Admins</div></div>
+      </div>
+    </div>
+
+    <!-- Quick Promote -->
+    <div class="card">
+      <div class="card-title">⚡ Quick Role Change</div>
+      <p class="card-sub">Enter a farmer's phone number to promote or demote their role instantly.</p>
+      <div class="form-row">
+        <div class="field">
+          <label>Phone Number</label>
+          <input type="tel" id="promotePhone" placeholder="10-digit phone" maxlength="10" />
+        </div>
+        <div class="field">
+          <label>New Role</label>
+          <select class="role-select" id="promoteRole">
+            <option value="fpo_manager">🏢 FPO Manager</option>
+            <option value="farmer">🌾 Farmer (demote)</option>
+            <option value="admin">🔑 Admin</option>
+          </select>
+        </div>
+        <button class="action-btn green" onclick="promoteUser()">Set Role →</button>
+      </div>
+      <div class="result-box" id="promoteResult"></div>
+    </div>
+
+    <!-- FPO Credential Setup -->
+    <div class="card">
+      <div class="card-title">🔐 Set FPO Dashboard Credentials</div>
+      <p class="card-sub">After promoting a user to FPO Manager, set their login username and password for the FPO Web Dashboard. This is separate from their mobile OTP login.</p>
+      <div class="form-row">
+        <div class="field">
+          <label>FPO Manager Phone</label>
+          <input type="tel" id="credPhone" placeholder="10-digit phone" maxlength="10" />
+        </div>
+        <div class="field">
+          <label>Dashboard Username</label>
+          <input type="text" id="credUsername" placeholder="e.g. fpo_nagpur" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Dashboard Password</label>
+          <input type="password" id="credPassword" placeholder="Min 8 characters" autocomplete="new-password" />
+        </div>
+        <button class="action-btn blue" onclick="setFPOCredentials()">Set Credentials 🔐</button>
+      </div>
+      <div class="result-box" id="credResult"></div>
+      <div style="margin-top:14px;padding:12px 16px;background:#F0F7FF;border-radius:10px;border-left:3px solid #3B82F6">
+        <p style="font-size:12px;color:#1E40AF;font-weight:600">
+          📌 Workflow: Promote user → Set credentials → Share username+password with the FPO Manager → They login at <strong>/index.html</strong>
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════ FPO MANAGERS TAB ══════════════════════════════════════════════ -->
+  <div class="tab-panel" id="panel-fpo">
+    <div class="card">
+      <div class="card-title">🏢 FPO Manager Accounts</div>
+      <p class="card-sub">All users with FPO Manager role. ✅ = credentials set (they can login to web dashboard). ❌ = credentials not yet set.</p>
+      <div id="fpoTableArea">
+        <div class="loading"><div class="spinner"></div>Loading FPO managers...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ ALL USERS TAB ════════════════════════════════════════════════ -->
+  <div class="tab-panel" id="panel-users">
+    <div class="card">
+      <div class="card-title">👥 All Users</div>
+      <div class="table-toolbar">
+        <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search by name or phone..." oninput="filterUsers()" />
+        <select class="filter-select" id="roleFilter" onchange="loadUsers()">
+          <option value="">All Roles</option>
+          <option value="farmer">🌾 Farmers</option>
+          <option value="fpo_manager">🏢 FPO Managers</option>
+          <option value="admin">🔑 Admins</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadUsers()">↻ Refresh</button>
+      </div>
+      <div id="tableArea">
+        <div class="loading"><div class="spinner"></div>Loading users...</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API = 'https://mitticard-backend.onrender.com';
+  let ADMIN_KEY = '';
+  let allUsers  = [];
+
+  // ── Login ─────────────────────────────────────────────────────────────────
+  window.onload = () => {
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && document.getElementById('loginOverlay').style.display !== 'none')
+        doAdminLogin();
+    });
+    const saved = sessionStorage.getItem('mc_admin_key');
+    if (saved) { ADMIN_KEY = saved; hideSplash(); loadAll(); }
+  };
+
+  async function doAdminLogin() {
+    const key = document.getElementById('adminKeyInput').value.trim();
+    if (!key) return;
+    try {
+      const res = await fetch(`${API}/auth/admin/users?role=admin`, {
+        headers: { 'X-Admin-Key': key }
+      });
+      if (res.status === 403) { showLoginErr('Wrong admin key'); return; }
+      ADMIN_KEY = key;
+      sessionStorage.setItem('mc_admin_key', key);
+      hideSplash();
+      loadAll();
+    } catch { showLoginErr('Cannot reach server. Is backend awake?'); }
+  }
+
+  function hideSplash() { document.getElementById('loginOverlay').style.display = 'none'; }
+  function showLoginErr(msg) {
+    const el = document.getElementById('loginErr');
+    el.textContent = '❌ ' + msg;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 4000);
+  }
+  function doLogout() { sessionStorage.removeItem('mc_admin_key'); location.reload(); }
+
+  // ── Tabs ─────────────────────────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      const panels = ['overview','fpo','users'];
+      t.classList.toggle('active', panels[i] === name);
+    });
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    if (name === 'fpo')   loadFPOManagers();
+    if (name === 'users') loadUsers();
+  }
+
+  // ── Load all on start ─────────────────────────────────────────────────────
+  function loadAll() { loadUsers(); loadFPOManagers(); }
+
+  // ── Users ─────────────────────────────────────────────────────────────────
+  async function loadUsers() {
+    document.getElementById('tableArea').innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+    const role = document.getElementById('roleFilter').value;
+    const url  = role ? `${API}/auth/admin/users?role=${role}` : `${API}/auth/admin/users`;
+    try {
+      const res  = await fetch(url, { headers: { 'X-Admin-Key': ADMIN_KEY } });
+      const data = await res.json();
+      allUsers = data.users || [];
+      updateStats(allUsers);
+      renderUsersTable(allUsers);
+    } catch (err) {
+      document.getElementById('tableArea').innerHTML = `<div class="empty">❌ ${err.message}</div>`;
+    }
+  }
+
+  function updateStats(users) {
+    document.getElementById('statTotal').textContent   = users.length;
+    document.getElementById('statFarmers').textContent = users.filter(u => u.role === 'farmer').length;
+    document.getElementById('statFPO').textContent     = users.filter(u => u.role === 'fpo_manager').length;
+    document.getElementById('statAdmin').textContent   = users.filter(u => u.role === 'admin').length;
+  }
+
+  function filterUsers() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    renderUsersTable(allUsers.filter(u =>
+      (u.name || '').toLowerCase().includes(q) || (u.phone || '').includes(q)
+    ));
+  }
+
+  function renderUsersTable(users) {
+    if (!users.length) { document.getElementById('tableArea').innerHTML = '<div class="empty">No users found.</div>'; return; }
+    const rolePill = role => ({
+      farmer:      '<span class="role-pill role-farmer">🌾 Farmer</span>',
+      fpo_manager: '<span class="role-pill role-fpo">🏢 FPO Manager</span>',
+      admin:       '<span class="role-pill role-admin">🔑 Admin</span>',
+    })[role] || role;
+
+    const actionBtn = u => {
+      if (u.role === 'farmer')      return `<button class="quick-btn quick-promote" onclick="quickRole('${u.phone}','fpo_manager')">→ FPO</button>`;
+      if (u.role === 'fpo_manager') return `<button class="quick-btn quick-demote"  onclick="quickRole('${u.phone}','farmer')">→ Farmer</button>`;
+      return '<span style="color:var(--muted);font-size:11px">Protected</span>';
+    };
+
+    document.getElementById('tableArea').innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Phone</th><th>Role</th><th>District</th><th>Joined</th><th>Action</th></tr></thead>
+          <tbody>${users.map(u => `
+            <tr>
+              <td><strong>${u.name || '—'}</strong></td>
+              <td style="font-family:monospace;font-size:13px">${u.phone}</td>
+              <td>${rolePill(u.role)}</td>
+              <td>${u.district || '—'}</td>
+              <td style="white-space:nowrap">${fmtDate(u.created_at)}</td>
+              <td>${actionBtn(u)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="padding:10px 0;color:var(--muted);font-size:12px">${users.length} user(s)</div>`;
+  }
+
+  // ── FPO Managers ─────────────────────────────────────────────────────────
+  async function loadFPOManagers() {
+    document.getElementById('fpoTableArea').innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+    try {
+      const res  = await fetch(`${API}/auth/admin/users?role=fpo_manager`, { headers: { 'X-Admin-Key': ADMIN_KEY } });
+      const data = await res.json();
+      const fpos = data.users || [];
+      if (!fpos.length) {
+        document.getElementById('fpoTableArea').innerHTML = '<div class="empty">No FPO Managers yet. Promote a farmer from the Overview tab.</div>';
+        return;
+      }
+      document.getElementById('fpoTableArea').innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th><th>Phone</th><th>Dashboard Username</th><th>Credentials</th><th>District</th><th>Joined</th><th>Action</th>
+              </tr>
+            </thead>
+            <tbody>${fpos.map(u => `
+              <tr>
+                <td><strong>${u.name || '—'}</strong></td>
+                <td style="font-family:monospace">${u.phone}</td>
+                <td>${u.fpo_username ? `<code style="background:#EEF2FF;padding:3px 8px;border-radius:6px;color:#4338CA;font-size:13px">${u.fpo_username}</code>` : '<span style="color:var(--muted);font-size:12px">Not set</span>'}</td>
+                <td>${u.fpo_username ? '<span class="fpo-tag">✅ Ready</span>' : '<span style="color:var(--danger);font-size:12px;font-weight:700">❌ Set credentials</span>'}</td>
+                <td>${u.district || '—'}</td>
+                <td style="white-space:nowrap">${fmtDate(u.created_at)}</td>
+                <td>
+                  <button class="quick-btn quick-demote" onclick="quickRole('${u.phone}','farmer')">Demote</button>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:16px;padding:14px;background:#FFF3E0;border-radius:10px;border-left:3px solid #F59E0B">
+          <strong style="color:#92400E;font-size:13px">⚠️ Managers with ❌ status cannot login to the web dashboard until you set their credentials in the Overview tab.</strong>
+        </div>`;
+    } catch (err) {
+      document.getElementById('fpoTableArea').innerHTML = `<div class="empty">❌ ${err.message}</div>`;
+    }
+  }
+
+  // ── Promote / demote ─────────────────────────────────────────────────────
+  async function promoteUser() {
+    const phone = document.getElementById('promotePhone').value.trim();
+    const role  = document.getElementById('promoteRole').value;
+    const box   = document.getElementById('promoteResult');
+    if (!/^\d{10}$/.test(phone)) { showResult(box, '❌ Enter a valid 10-digit phone number.', 'error'); return; }
+    try {
+      const res  = await fetch(`${API}/auth/admin/set-role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
+        body: JSON.stringify({ phone, role }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showResult(box, `✅ ${data.user.name} (${phone}) is now: ${role.replace('_',' ')}`, 'success');
+        document.getElementById('promotePhone').value = '';
+        loadAll();
+      } else { showResult(box, `❌ ${data.message}`, 'error'); }
+    } catch { showResult(box, '❌ Server error.', 'error'); }
+  }
+
+  async function quickRole(phone, role) {
+    if (!confirm(`Change ${phone} → "${role.replace('_',' ')}"?`)) return;
+    try {
+      const res  = await fetch(`${API}/auth/admin/set-role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
+        body: JSON.stringify({ phone, role }),
+      });
+      const data = await res.json();
+      if (data.success) loadAll();
+      else alert('Error: ' + data.message);
+    } catch { alert('Server error'); }
+  }
+
+  // ── Set FPO Credentials ──────────────────────────────────────────────────
+  async function setFPOCredentials() {
+    const phone    = document.getElementById('credPhone').value.trim();
+    const username = document.getElementById('credUsername').value.trim();
+    const password = document.getElementById('credPassword').value;
+    const box      = document.getElementById('credResult');
+
+    if (!/^\d{10}$/.test(phone))  { showResult(box, '❌ Enter a valid 10-digit phone number.', 'error'); return; }
+    if (!username)                 { showResult(box, '❌ Username cannot be empty.', 'error'); return; }
+    if (password.length < 8)       { showResult(box, '❌ Password must be at least 8 characters.', 'error'); return; }
+
+    try {
+      const res  = await fetch(`${API}/auth/admin/set-fpo-credentials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
+        body: JSON.stringify({ phone, username, password }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showResult(box,
+          `✅ Credentials set for ${data.user.name}!\n👤 Username: ${data.user.fpo_username}\n🔑 Share these with the FPO manager.`,
+          'success');
+        document.getElementById('credPhone').value    = '';
+        document.getElementById('credUsername').value = '';
+        document.getElementById('credPassword').value = '';
+        loadFPOManagers();
+      } else { showResult(box, `❌ ${data.message}`, 'error'); }
+    } catch { showResult(box, '❌ Server error.', 'error'); }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function showResult(el, msg, type) {
+    el.textContent  = msg;
+    el.className    = 'result-box ' + type;
+    el.style.display = 'block';
+    el.style.whiteSpace = 'pre-line';
+    setTimeout(() => el.style.display = 'none', 7000);
+  }
+
+  function fmtDate(ds) {
+    if (!ds) return '—';
+    return new Date(ds).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'2-digit' });
+  }
+</script>
+</body>
+</html>

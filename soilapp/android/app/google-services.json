@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "568516760941",
+    "project_id": "soil-health-advisory-61b5a",
+    "storage_bucket": "soil-health-advisory-61b5a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:568516760941:android:af154ad03c0f0ccc017664",
+        "android_client_info": {
+          "package_name": "com.soilapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzOYpGcn03td44e8oFWTMQma3ZGkAoAvM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
