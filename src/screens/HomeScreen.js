@@ -647,7 +647,13 @@ const getSeverityTextColor = (severity) => {
 
             {/* ── SCORE CARD ───────────────────────────────────────────────── */}
             <View style={[styles.scoreCard, shadows.md]}>
-              <Text style={styles.scoreCardTitle}>🌱 {t('advisory.score_label')}</Text>
+              <View style={styles.scoreCardTitleRow}>
+                <View style={styles.soilLeafIconContainer}>
+                  <Text style={styles.soilLeafSprout}>🌱</Text>
+                  <View style={styles.soilLeafMound} />
+                </View>
+                <Text style={styles.scoreCardTitleText}>{t('advisory.score_label')}</Text>
+              </View>
 
               {loading ? (
                 <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.xl }} />
@@ -1314,14 +1320,42 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.02)',
   },
-  scoreCardTitle: {
+  scoreCardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  scoreCardTitleText: {
     fontSize: fontSizes.xs,
     fontWeight: fontWeights.bold,
     color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.md,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  soilLeafIconContainer: {
+    width: 20,
+    height: 18,
+    marginRight: 6,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    position: 'relative',
+  },
+  soilLeafSprout: {
+    fontSize: 14,
+    position: 'absolute',
+    bottom: 2,
+    zIndex: 2,
+  },
+  soilLeafMound: {
+    width: 14,
+    height: 5,
+    backgroundColor: '#78350F', // Dark soil brown
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 1,
+    borderBottomRightRadius: 1,
+    zIndex: 1,
   },
   scoreCardBody: {
     flexDirection: 'row',
