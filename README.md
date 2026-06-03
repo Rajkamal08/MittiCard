@@ -1,4 +1,9 @@
-🌱 MittiCard — Soil Health Advisory App
+Here is the completely updated `README.md`. I have added a brand new **"🔗 Live Demos & Links"** section right at the top so recruiters can instantly find your deployed web dashboard and the Android APK download link! 
+
+Just copy and paste this entire block into your `README.md` file on GitHub:
+
+```markdown
+# 🌱 MittiCard — Soil Health Advisory App
 
 > **AI-powered soil health advisory for Indian farmers, built for ICAR Soil Health Cards**
 
@@ -6,7 +11,15 @@
 [![Database](https://img.shields.io/badge/Database-PostgreSQL-blue)](https://render.com)
 [![Mobile](https://img.shields.io/badge/Mobile-React%20Native-61DAFB)](https://reactnative.dev)
 [![OTP](https://img.shields.io/badge/OTP-2Factor%20Voice%20Call-orange)](https://2factor.in)
-[![AI](https://img.shields.io/badge/OCR-Gemini%20Vision%20API-purple)](https://ai.google.dev)
+[![AI](https://img.shields.io/badge/OCR-Groq%20Llama%203.2%20Vision-purple)](https://groq.com)
+
+---
+
+## 🔗 Live Demos & Links
+
+- **🌐 Live Web App (FPO Dashboard):** [https://mitticard-backend.onrender.com/fpo-dashboard](https://mitticard-backend.onrender.com/fpo-dashboard)
+- **📱 Android App (APK Download):** [Download Latest Release](https://github.com/Rajkamal08/MittiCard/releases/tag/v1.0.0)
+- **⚙️ Live Backend API:** [https://mitticard-backend.onrender.com](https://mitticard-backend.onrender.com)
 
 ---
 
@@ -14,7 +27,7 @@
 
 MittiCard is a mobile app that helps Indian farmers understand their soil health. A farmer scans their **ICAR Soil Health Card** with the camera, and the app:
 
-1. Extracts **8 soil nutrients** (pH, N, P, K, OC, Zn, S, Fe) using Gemini Vision OCR
+1. Extracts **8 soil nutrients** (pH, N, P, K, OC, Zn, S, Fe) using **Groq Llama 3.2 Vision** (with Gemini fallback) and Tesseract OCR
 2. Runs them through a **rule-based advisory engine**
 3. Returns **crop-specific fertilizer recommendations** in Hindi or English
 4. Shows **cost estimates** and a **crop calendar** with weekly tasks
@@ -37,7 +50,7 @@ FPO (Farmer Producer Organisation) managers get a **web dashboard** showing soil
 │         Node.js + Express Backend (Render)           │
 │                                                      │
 │  /auth    → Voice OTP (2Factor.in)                  │
-│  /advisory → Advisory Engine + Gemini Vision OCR     │
+│  /advisory → Advisory Engine + Groq Vision OCR       │
 │  /fpo     → FPO Dashboard APIs + CSV Export         │
 │  /fpo-dashboard → Web Dashboard (React app)         │
 └──────────────────────┬──────────────────────────────┘
@@ -60,7 +73,7 @@ FPO (Farmer Producer Organisation) managers get a **web dashboard** showing soil
 - Role support: `farmer` / `fpo_manager`
 
 ### 📸 Soil Analysis
-- **Camera OCR** — scan ICAR Soil Health Card photo → Gemini Vision extracts nutrients
+- **Camera OCR** — scan ICAR Soil Health Card photo → **Groq Llama 3.2 Vision** instantly extracts nutrients (fallback to Gemini/Tesseract)
 - **Manual Entry** — type soil values directly
 - Supports **8 parameters**: pH, Nitrogen, Phosphorus, Potassium, Organic Carbon, Zinc, Sulfur, Iron
 
@@ -107,7 +120,7 @@ FPO (Farmer Producer Organisation) managers get a **web dashboard** showing soil
 | `ProfileScreen` | Name + district setup (first login) |
 | `HomeScreen` | Dashboard with scan options |
 | `SoilInputScreen` | Manual nutrient entry form |
-| `OCRScreen` | Camera scan + Gemini Vision OCR |
+| `OCRScreen` | Camera scan + Groq Vision OCR |
 | `AdvisoryResultScreen` | Full advisory with TTS |
 | `CropCalendarScreen` | Week-by-week crop tasks |
 | `FPODashboardScreen` | FPO manager farm overview |
@@ -143,7 +156,7 @@ POST /auth/save-fcm-token { fcm_token }              → saves device token
 ```
 POST /advisory/manual    { crop, ph, nitrogen, ... } → returns advisory
 POST /advisory/ocr       { crop, ph, nitrogen, ... } → same, OCR input
-POST /advisory/ocr-scan  { image_base64 }            → extracts soil values
+POST /advisory/ocr-scan  { image_base64 }            → extracts soil values using Groq Vision
 GET  /advisory/:id                                   → fetch past advisory
 ```
 
@@ -174,6 +187,7 @@ GET  /fpo-dashboard      → opens FPO React web dashboard (browser)
 ### Required Environment Variables (Render Dashboard)
 ```env
 TWOFACTOR_API_KEY=your_2factor_api_key
+GROQ_API_KEY=your_groq_api_key
 GEMINI_API_KEY=your_gemini_api_key
 JWT_SECRET=your_jwt_secret
 DB_HOST=your_postgres_host
@@ -230,7 +244,7 @@ Soil Health/
 ├── backend/
 │   ├── engine/
 │   │   ├── advisor.js        # Rule-based advisory engine (7 crops)
-│   │   ├── ocrExtractor.js   # Gemini Vision API OCR
+│   │   ├── ocrExtractor.js   # Groq Vision API OCR
 │   │   └── validate.js       # Input validation
 │   ├── models/
 │   │   └── createTables.js   # PostgreSQL schema (6 tables)
@@ -272,7 +286,7 @@ Soil Health/
 | Database | PostgreSQL (Render) |
 | Web Dashboard | React + Vite |
 | Auth | JWT + 2Factor.in (Voice OTP) |
-| OCR | Google Gemini Vision API |
+| OCR | Groq Llama 3.2 Vision + Gemini API |
 | Push Notifications | Firebase Cloud Messaging |
 | Translations | i18next (Hindi + English) |
 | Text-to-Speech | react-native-tts |
