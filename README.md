@@ -1,9 +1,4 @@
-Here is the completely updated `README.md`. I have added a brand new **"🔗 Live Demos & Links"** section right at the top so recruiters can instantly find your deployed web dashboard and the Android APK download link! 
-
-Just copy and paste this entire block into your `README.md` file on GitHub:
-
-```markdown
-# 🌱 MittiCard — Soil Health Advisory App
+ 🌱 MittiCard — Soil Health Advisory App
 
 > **AI-powered soil health advisory for Indian farmers, built for ICAR Soil Health Cards**
 
