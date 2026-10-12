@@ -1,4 +1,4 @@
- 🌱 MittiCard — Soil Health Advisory App
+# 🌱 MittiCard — Soil Health Advisory App
 
 > **AI-powered soil health advisory for Indian farmers, built for ICAR Soil Health Cards**
 
