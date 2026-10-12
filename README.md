@@ -63,7 +63,7 @@ FPO (Farmer Producer Organisation) managers get a **web dashboard** showing soil
 
 ### 🔐 Authentication
 - Phone number login with **Voice OTP** (2Factor.in)
-- Works on **any Indian mobile number** — no DLT registration needed
+- Works on **any Indian mobile number** — no DLT registration 
 - JWT tokens (30-day validity)
 - Role support: `farmer` / `fpo_manager`
 
